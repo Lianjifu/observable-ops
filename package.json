@@ -1,0 +1,24 @@
+{
+  "name": "observable-ops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "智能系统运维可观测性 · Observable Ops 文档站点",
+  "scripts": {
+    "dev": "python3 serve/dev-server.py",
+    "serve": "python3 serve/html-server.py",
+    "build": "node build-one.js",
+    "build:all": "cd dist && find ../docs -name '*.md' ! -name '_sidebar.md' ! -name '_coverpage.md' ! -name 'SUMMARY.md' -exec sh -c 'node ../build-one.js docs/{}' \\;"
+  },
+  "keywords": ["observability", "aiops", "documentation"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "docsify": "^4.13.1",
+    "docsify-mermaid": "^2.0.1",
+    "marked": "^18.0.3"
+  },
+  "devDependencies": {
+    "docsify-cli": "^4.4.4",
+    "mermaid": "^11.15.0"
+  }
+}
