@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模块 08 · 影响分析</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 62.5%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 15px;
+      color: #1e293b;
+      line-height: 1.7;
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== Section Color Themes ===== */
+    .sidebar-section[data-section="1"] { --section-clr: #4f46e5; --section-bg: rgba(79,70,229,0.08); --section-bg-hover: rgba(79,70,229,0.12); --section-light: #eef2ff; }
+    .sidebar-section[data-section="2"] { --section-clr: #0d9488; --section-bg: rgba(13,148,136,0.08); --section-bg-hover: rgba(13,148,136,0.12); --section-light: #f0fdfa; }
+    .sidebar-section[data-section="3"] { --section-clr: #d97706; --section-bg: rgba(217,119,6,0.08); --section-bg-hover: rgba(217,119,6,0.12); --section-light: #fffbeb; }
+
+    /* ===== Layout ===== */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ===== Sidebar ===== */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #f8fafc;
+      border-right: 1px solid #e2e8f0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
+      padding: 20px 20px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand .icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* --- Search --- */
+    .sidebar-search {
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box:focus-within {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: #1e293b;
+      background: transparent;
+    }
+    .search-box input::placeholder { color: #94a3b8; }
+    .search-box svg { width: 15px; height: 15px; color: #94a3b8; flex-shrink: 0; }
+
+    /* --- Quick Links --- */
+    /* --- Scrollable Nav Area --- */
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 12px;
+    }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    .sidebar-nav ul, .sidebar-nav li { list-style: none; }
+
+    /* --- Section Header (collapsible toggle) --- */
+    .sidebar-section { margin-bottom: 2px; }
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .sidebar-section-header:hover { background: rgba(0,0,0,0.04); }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .section-num {
+      width: 22px; height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--section-clr, #4f46e5);
+      flex-shrink: 0;
+    }
+    .section-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-section-header .arrow {
+      width: 16px; height: 16px;
+      color: #94a3b8;
+      flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+    .sidebar-section-header.open .arrow {
+      transform: rotate(90deg);
+      color: var(--section-clr, #4f46e5);
+    }
+
+    /* --- Section Items (collapsible content) --- */
+    .sidebar-section-items {
+      display: none;
+    }
+    .sidebar-section-items.open {
+      display: block;
+    }
+    .sidebar-section-items > ul {
+      padding: 0 8px 0;
+    }
+    .sidebar-section-items li { margin: 1px 0; }
+    .sidebar-section-items a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: #64748b;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      margin-left: 2px;
+    }
+    .sidebar-section-items a:hover {
+      color: #1e293b;
+      background: rgba(0,0,0,0.03);
+      border-left-color: #cbd5e1;
+    }
+    .sidebar-section-items a.active {
+      color: var(--section-clr, #4f46e5);
+      background: var(--section-bg, rgba(79,70,229,0.08));
+      border-left-color: var(--section-clr, #4f46e5);
+      font-weight: 500;
+    }
+    .sidebar-section-items a .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .sidebar-section-items a:hover .dot { background: #94a3b8; }
+    .sidebar-section-items a.active .dot { background: var(--section-clr, #4f46e5); }
+
+    /* --- External Links --- */
+    .sidebar-footer {
+      padding: 8px 14px 14px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      flex-shrink: 0;
+    }
+    .sidebar-footer a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .sidebar-footer a:hover { border-color: #4f46e5; color: #4f46e5; background: #eef2ff; }
+    .sidebar-footer a svg { width: 15px; height: 15px; opacity: 0.5; }
+
+    /* ===== Content ===== */
+    .content {
+      flex: 1;
+      margin-left: 280px;
+      padding: 48px 64px;
+      min-height: 100vh;
+      max-width: 1400px;
+    }
+
+    /* ===== Typography ===== */
+    .markdown-section h1 {
+      font-size: 28px; font-weight: 700; color: #0f172a;
+      letter-spacing: -0.02em; margin: 0 0 24px;
+      padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;
+    }
+    .markdown-section h2 { font-size: 20px; font-weight: 600; color: #1e293b; letter-spacing: -0.01em; margin: 40px 0 16px; }
+    .markdown-section h3 { font-size: 16px; font-weight: 600; color: #4f46e5; margin: 28px 0 12px; }
+    .markdown-section h4 { font-size: 15px; font-weight: 600; color: #1e293b; margin: 20px 0 8px; }
+    .markdown-section p { margin: 12px 0; color: #475569; }
+    .markdown-section a { color: #4f46e5; text-decoration: none; font-weight: 500; }
+    .markdown-section a:hover { text-decoration: underline; }
+    .markdown-section code {
+      background: #f1f5f9; color: #0f172a;
+      padding: 2px 6px; font-size: 13px;
+      border-radius: 4px; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
+    }
+    .markdown-section pre { background: #1e293b; border-radius: 12px; padding: 20px 24px; overflow-x: auto; margin: 20px 0; }
+    .markdown-section pre code { background: transparent; color: #e2e8f0; padding: 0; font-size: 13px; line-height: 1.6; }
+    .markdown-section blockquote {
+      background: #f8fafc; border-left: 4px solid #4f46e5;
+      border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0;
+    }
+    .markdown-section blockquote p { margin: 0; color: #475569; }
+    .markdown-section table {
+      width: 100%; border-collapse: collapse; margin: 20px 0;
+      font-size: 14px; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .markdown-section table th { background: #f8fafc; font-weight: 600; text-align: left; padding: 12px 16px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .markdown-section table td { padding: 12px 16px; border-top: 1px solid #e2e8f0; }
+    .markdown-section table tr:nth-child(2n) td { background: #f8fafc; }
+    .markdown-section ul, .markdown-section ol { padding-left: 24px; margin: 12px 0; }
+    .markdown-section li { margin: 6px 0; color: #475569; }
+    .markdown-section hr { height: 1px; background: #e2e8f0; border: none; margin: 32px 0; }
+    .markdown-section img { max-width: 100%; height: auto; border-radius: 8px; }
+
+    /* ===== Section Callout ===== */
+    .markdown-section .section-callout {
+      background: linear-gradient(135deg, rgba(79,70,229,0.04) 0%, rgba(124,58,237,0.04) 100%);
+      border-left: 4px solid #4f46e5; border-radius: 0 12px 12px 0;
+      padding: 18px 24px 22px; margin: 8px 0 28px;
+    }
+    .markdown-section .section-callout blockquote {
+      background: rgba(79,70,229,0.07); border: none; border-radius: 8px;
+      padding: 10px 14px; margin: 0 0 16px; font-size: 14px; color: #1e293b;
+    }
+    .markdown-section .section-callout blockquote p { margin: 0; color: #1e293b; }
+    .markdown-section .section-callout h4 { color: #4f46e5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 18px 0 10px; }
+    .markdown-section .section-callout h4:first-of-type { margin-top: 0; }
+    .markdown-section .section-callout ol { list-style: none; counter-reset: callout-item; padding: 0; margin: 0 0 12px; }
+    .markdown-section .section-callout ol li {
+      counter-increment: callout-item; padding: 8px 0 8px 40px;
+      position: relative; color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0;
+    }
+    .markdown-section .section-callout ol li::before {
+      content: counter(callout-item);
+      position: absolute; left: 0; top: 7px;
+      width: 26px; height: 26px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff; border-radius: 50%; text-align: center;
+      line-height: 26px; font-size: 12px; font-weight: 700;
+    }
+    .markdown-section .section-callout table { margin: 8px 0 4px; font-size: 13px; }
+    .markdown-section .section-callout table th { background: rgba(79,70,229,0.08); color: #4f46e5; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .markdown-section .section-callout table th,
+    .markdown-section .section-callout table td { padding: 8px 12px; }
+
+    /* ===== Mermaid ===== */
+    .mermaid { background: #f8fafc; border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; border: 1px solid #e2e8f0; display: block; }
+    .mermaid.rendered { display: block; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    .mermaid-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; color: #dc2626; margin: 20px 0; }
+    .mermaid-loading { background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 12px; padding: 24px; margin: 20px 0; color: #64748b; text-align: center; }
+
+    /* ===== Navigation ===== */
+    .nav { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+    .nav a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 18px; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; color: #475569; text-decoration: none;
+      font-size: 14px; font-weight: 500; transition: all 0.15s;
+    }
+    .nav a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    /* ===== Mobile ===== */
+    .sidebar-toggle {
+      display: none; position: fixed; top: 12px; left: 12px; z-index: 100;
+      background: white; border: 1px solid #e2e8f0; color: #1e293b;
+      width: 38px; height: 38px; border-radius: 8px; cursor: pointer;
+      font-size: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      align-items: center; justify-content: center;
+    }
+    @media (max-width: 1024px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-toggle { display: flex; }
+      .content { margin-left: 0; padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <button class="sidebar-toggle">☰</button>
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <a href="/index.html" class="sidebar-brand">
+          <span class="icon">📚</span>
+          智能系统运维可观测性
+        </a>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="搜索文档..." id="searchInput">
+        </div>
+      </div>
+
+      <div class="sidebar-nav">
+        <div class="sidebar-section" data-section="1">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">1</span>
+            <span class="section-name">业务流程</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/01-intro/01-product-overview.html"><span class="dot"></span>业务 01 · 产品概述</a></li><li><a href="/01-intro/02-topology-modeling.html"><span class="dot"></span>业务 02 · 拓扑建模</a></li><li><a href="/01-intro/03-data-fusion.html"><span class="dot"></span>业务 03 · 数据融合</a></li><li><a href="/01-intro/04-intelligent-sensing.html"><span class="dot"></span>业务 04 · 智能感知</a></li><li><a href="/01-intro/05-cognitive-network.html"><span class="dot"></span>业务 05 · 认知网络</a></li><li><a href="/01-intro/06-fault-analysis.html"><span class="dot"></span>业务 06 · 故障分析</a></li><li><a href="/01-intro/07-root-cause.html"><span class="dot"></span>业务 07 · 根因定位</a></li><li><a href="/01-intro/08-impact-analysis.html"><span class="dot"></span>业务 08 · 影响分析</a></li><li><a href="/01-intro/09-intelligent-decision.html"><span class="dot"></span>业务 09 · 智能决策</a></li><li><a href="/01-intro/10-auto-execution.html"><span class="dot"></span>业务 10 · 自动执行</a></li><li><a href="/01-intro/11-knowledge-evolution.html"><span class="dot"></span>业务 11 · 知识演进</a></li></ul></div></div><div class="sidebar-section" data-section="2">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">2</span>
+            <span class="section-name">功能逻辑</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/02-architecture/01-module-architecture.html"><span class="dot"></span>模块 01 · 总体架构</a></li><li><a href="/02-architecture/02-topology-modeling.html"><span class="dot"></span>模块 02 · 拓扑建模</a></li><li><a href="/02-architecture/03-data-fusion.html"><span class="dot"></span>模块 03 · 数据融合</a></li><li><a href="/02-architecture/04-intelligent-sensing.html"><span class="dot"></span>模块 04 · 智能感知</a></li><li><a href="/02-architecture/05-cognitive-network.html"><span class="dot"></span>模块 05 · 认知网络</a></li><li><a href="/02-architecture/06-fault-diagnosis.html"><span class="dot"></span>模块 06 · 故障研判</a></li><li><a href="/02-architecture/07-root-cause.html"><span class="dot"></span>模块 07 · 根因分析</a></li><li><a href="/02-architecture/08-impact-analysis.html"><span class="dot"></span>模块 08 · 影响分析</a></li><li><a href="/02-architecture/09-intelligent-decision.html"><span class="dot"></span>模块 09 · 智能决策</a></li><li><a href="/02-architecture/10-auto-execution.html"><span class="dot"></span>模块 10 · 自动执行</a></li><li><a href="/02-architecture/11-knowledge-evolution.html"><span class="dot"></span>模块 11 · 知识进化</a></li></ul></div></div><div class="sidebar-section" data-section="3">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">3</span>
+            <span class="section-name">参考资料</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/03-reference/01-foundation.html"><span class="dot"></span>参考 01 · AIOps 基础与标准</a></li><li><a href="/03-reference/02-root-cause-reasoning.html"><span class="dot"></span>参考 02 · 根因推理算法</a></li><li><a href="/03-reference/03-knowledge-graph.html"><span class="dot"></span>参考 03 · 知识图谱技术</a></li><li><a href="/03-reference/04-sre-agents.html"><span class="dot"></span>参考 04 ·  SRE Agent 架构</a></li><li><a href="/03-reference/05-evaluation-framework.html"><span class="dot"></span>参考 05 · 评估框架与落地</a></li></ul></div></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="https://github.com" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </nav>
+
+    <main class="content">
+      <article class="markdown-section">
+        <h1>模块 08 · 影响分析</h1>
+<blockquote>
+<p>影响分析是 Observable Ops 的「正向扩散引擎」——从故障节点出发，沿拓扑正向传播，计算故障的下游影响范围、业务损失估算和恢复时间预测，为智能决策提供 Impact 维度输入。</p>
+</blockquote>
+<hr>
+<h2>📑 目录</h2>
+<h3>章节导航</h3>
+<ul>
+<li><ol>
+<li>模块定位与职责</li>
+</ol>
+</li>
+<li><ol start="2">
+<li>影响分析模型</li>
+</ol>
+</li>
+<li><ol start="3">
+<li>核心功能分解</li>
+</ol>
+</li>
+<li><ol start="4">
+<li>API 设计规范</li>
+</ol>
+</li>
+<li><ol start="5">
+<li>数据流架构</li>
+</ol>
+</li>
+<li><ol start="6">
+<li>模块协作关系</li>
+</ol>
+</li>
+<li><ol start="7">
+<li>量化指标体系</li>
+</ol>
+</li>
+<li><ol start="8">
+<li>部署架构</li>
+</ol>
+</li>
+<li><ol start="9">
+<li>本章小结</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h2>1. 模块定位与职责</h2>
+<h3>1.1 在 4 层架构中的位置</h3>
+<p>影响分析属于<strong>能力层</strong>核心模块，从根因分析模块接收故障节点信息，结合拓扑建模的图结构，输出影响范围报告到智能决策和 Dashboard。</p>
+<div class="mermaid">flowchart LR
+    subgraph 数据层["数据层 Data Layer"]
+        T[02 拓扑建模]
+    end
+
+    subgraph 能力层["能力层 Capability Layer"]
+        RCA[07 根因分析]
+        IA[08 影响分析]
+        ID[09 智能决策]
+        DASH[Dashboard]
+    end
+
+    RCA -->|故障节点| IA
+    T -->|拓扑图谱| IA
+    IA -->|影响范围报告| ID
+    IA -->|业务损失估算| DASH
+
+    style IA fill:#fff9c4,stroke:#f9a825,stroke-width:3px
+    style 数据层 fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style 能力层 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style RCA fill:#c8e6c9
+    style ID fill:#c8e6c9
+    style DASH fill:#c8e6c9
+    style T fill:#fff9c4</div><h3>1.2 核心职责</h3>
+<table>
+<thead>
+<tr>
+<th>职责</th>
+<th>描述</th>
+<th>输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>正向传播计算</strong></td>
+<td>从故障节点出发，沿拓扑正向（调用方向）计算下游影响范围</td>
+<td>影响节点列表</td>
+</tr>
+<tr>
+<td><strong>业务影响评分</strong></td>
+<td>根据业务重要性对受影响节点打分（核心业务 vs 非核心）</td>
+<td>Business Impact Score</td>
+</tr>
+<tr>
+<td><strong>级联故障预测</strong></td>
+<td>预测故障是否会引发级联扩散，估算扩散速度和范围</td>
+<td>Cascade Forecast</td>
+</tr>
+<tr>
+<td><strong>恢复时间估算</strong></td>
+<td>基于故障类型和影响范围，估算 MTTR（Mean Time To Repair）</td>
+<td>MTTR Estimate</td>
+</tr>
+<tr>
+<td><strong>业务损失评估</strong></td>
+<td>将影响范围映射到业务指标（订单量/用户量/收入）损失</td>
+<td>Business Loss Report</td>
+</tr>
+</tbody></table>
+<h3>1.3 核心设计原则</h3>
+<div class="mermaid">flowchart LR
+    P1[Forward Prop
+正向传播] --> P2[Business First
+业务优先]
+    P2 --> P3[Cascade Aware
+级联感知]
+    P3 --> P4[Time Sensitive
+时间敏感]
+    P4 -.-> P1
+    style P1 fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style P2 fill:#fff9c4,stroke:#f9a825,stroke-width:3px
+    style P3 fill:#fce4ec,stroke:#c62828,stroke-width:3px
+    style P4 fill:#e8f5e9,stroke:#388e3c,stroke-width:3px</div><ul>
+<li><strong>正向传播（Forward Prop）</strong>：从故障节点沿调用链向下游扩散，与根因分析的逆向传播互补</li>
+<li><strong>业务优先（Business First）</strong>：影响分析以业务损失为导向，而非纯技术节点数</li>
+<li><strong>级联感知（Cascade Aware）</strong>：预测故障是否会引发二次、三次扩散，提前预警</li>
+<li><strong>时间敏感（Time Sensitive）</strong>：恢复时间估算必须考虑时间成本，业务损失随时间累积</li>
+</ul>
+<h3>1.4 子模块划分</h3>
+<table>
+<thead>
+<tr>
+<th>子模块</th>
+<th>职责</th>
+<th>技术选型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Propagator</strong> 正向传播引擎</td>
+<td>从故障节点沿 CALLS 边向下游遍历，计算影响范围</td>
+<td>Python / Neo4j GDS</td>
+</tr>
+<tr>
+<td><strong>BusinessScorer</strong> 业务评分器</td>
+<td>根据业务重要性权重，计算业务影响得分</td>
+<td>Python / 加权评分模型</td>
+</tr>
+<tr>
+<td><strong>CascadePredictor</strong> 级联预测器</td>
+<td>预测故障扩散概率、速度、范围</td>
+<td>Python / PyTorch / 时序模型</td>
+</tr>
+<tr>
+<td><strong>RecoveryEstimator</strong> 恢复时间估算器</td>
+<td>基于故障类型和历史数据估算 MTTR</td>
+<td>Python / XGBoost</td>
+</tr>
+<tr>
+<td><strong>LossEvaluator</strong> 业务损失评估器</td>
+<td>将技术影响映射为业务指标损失</td>
+<td>Python / 业务模型</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. 影响分析模型</h2>
+<h3>2.1 影响范围模型（Impact Scope Model）</h3>
+<p>影响范围模型描述从故障节点出发能够影响到的所有下游节点及其层级关系。</p>
+<h4>2.1.1 影响节点</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>node_id</code></td>
+<td>String</td>
+<td>受影响的拓扑节点 ID</td>
+<td><code>svc-004</code></td>
+</tr>
+<tr>
+<td><code>node_name</code></td>
+<td>String</td>
+<td>受影响节点名称</td>
+<td><code>order-service</code></td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td>String</td>
+<td>节点类型标签</td>
+<td><code>Service</code></td>
+</tr>
+<tr>
+<td><code>impact_level</code></td>
+<td>Integer [1-5]</td>
+<td>影响层级（1=直接邻居，2=2跳，依此类推）</td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>impact_score</code></td>
+<td>Float [0-1]</td>
+<td>影响得分（综合业务重要性和传播概率）</td>
+<td><code>0.75</code></td>
+</tr>
+<tr>
+<td><code>is_critical</code></td>
+<td>Boolean</td>
+<td>是否为核心业务节点</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>propagation_probability</code></td>
+<td>Float [0-1]</td>
+<td>该节点实际被影响的概率</td>
+<td><code>0.85</code></td>
+</tr>
+<tr>
+<td><code>estimated_recovery_time_min</code></td>
+<td>Integer</td>
+<td>该节点恢复预计所需时间（分钟）</td>
+<td><code>15</code></td>
+</tr>
+</tbody></table>
+<h4>2.1.2 影响范围汇总</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>incident_id</code></td>
+<td>String</td>
+<td>关联的故障事件 ID</td>
+</tr>
+<tr>
+<td><code>fault_node_id</code></td>
+<td>String</td>
+<td>故障节点 ID</td>
+</tr>
+<tr>
+<td><code>total_affected</code></td>
+<td>Integer</td>
+<td>受影响节点总数</td>
+</tr>
+<tr>
+<td><code>by_label</code></td>
+<td>Map[String, Integer]</td>
+<td>按标签类型统计受影响节点数</td>
+</tr>
+<tr>
+<td><code>by_impact_level</code></td>
+<td>Map[Integer, Integer]</td>
+<td>按层级统计受影响节点数</td>
+</tr>
+<tr>
+<td><code>critical_count</code></td>
+<td>Integer</td>
+<td>核心业务节点受影响数量</td>
+</tr>
+<tr>
+<td><code>max_propagation_depth</code></td>
+<td>Integer</td>
+<td>最大传播深度（跳数）</td>
+</tr>
+</tbody></table>
+<h3>2.2 业务关键性评分模型（Business Criticality Score）</h3>
+<p>业务关键性评分衡量节点对业务的重要性，用于计算业务损失权重。</p>
+<div class="mermaid">flowchart TB
+    subgraph 评分因素["评分因素"]
+        F1[业务层级
+tier_weight]
+        F2[用户量
+user_weight]
+        F3[收入影响
+revenue_weight]
+        F4[SLA 要求
+sla_weight]
+        F5[可替代性
+替代性越低权重越高]
+    end
+
+    subgraph 模型["加权融合"]
+        W[权重配置]
+        CALC[Score = Σ wi*fi]
+    end
+
+    subgraph 输出["业务关键性评分"]
+        BCS[Business Criticality Score
+0.0 ~ 1.0]
+    end
+
+    F1 --> W
+    F2 --> W
+    F3 --> W
+    F4 --> W
+    F5 --> W
+    W --> CALC --> BCS
+
+    style W fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style CALC fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style BCS fill:#c8e6c9,stroke:#388e3c,stroke-width:3px</div><h4>2.2.1 评分维度说明</h4>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>计算方式</th>
+<th>权重（默认）</th>
+<th>数据来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>业务层级</strong></td>
+<td>P0=1.0, P1=0.8, P2=0.6, P3=0.4, P4=0.2</td>
+<td>0.30</td>
+<td>CMDB / 业务台账</td>
+</tr>
+<tr>
+<td><strong>用户量</strong></td>
+<td>日活用户数归一化到 [0,1]</td>
+<td>0.25</td>
+<td>业务系统埋点</td>
+</tr>
+<tr>
+<td><strong>收入影响</strong></td>
+<td>每分钟停机损失金额归一化</td>
+<td>0.25</td>
+<td>财务系统估算</td>
+</tr>
+<tr>
+<td><strong>SLA 要求</strong></td>
+<td>99.99%=1.0, 99.9%=0.8, 99%=0.6</td>
+<td>0.15</td>
+<td>合同/SLA 文档</td>
+</tr>
+<tr>
+<td><strong>可替代性</strong></td>
+<td>无替代=1.0, 低替代=0.7, 中替代=0.4, 高替代=0.1</td>
+<td>0.05</td>
+<td>架构评审文档</td>
+</tr>
+</tbody></table>
+<h3>2.3 恢复时间估算模型（MTTR Estimation Model）</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fault_type</code></td>
+<td>Enum</td>
+<td>故障类型：硬件故障/软件崩溃/网络中断/配置错误/容量不足</td>
+</tr>
+<tr>
+<td><code>fault_node_type</code></td>
+<td>Enum</td>
+<td>故障节点类型：Host/Middleware/Service/Database</td>
+</tr>
+<tr>
+<td><code>estimated_mttr_min</code></td>
+<td>Integer</td>
+<td>预计恢复时间（分钟）</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td>Float [0-1]</td>
+<td>估算置信度</td>
+</tr>
+<tr>
+<td><code>factors</code></td>
+<td>List[String]</td>
+<td>影响恢复时间的关键因素</td>
+</tr>
+<tr>
+<td><code>historical_avg_min</code></td>
+<td>Integer</td>
+<td>同类故障历史平均恢复时间</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. 核心功能分解</h2>
+<h3>3.1 正向传播（Forward Propagation）</h3>
+<h4>3.1.1 传播算法流程</h4>
+<ol>
+<li><strong>接收故障节点</strong>：从根因分析模块接收故障节点 ID 和故障类型</li>
+<li><strong>初始化传播队列</strong>：将故障节点作为 Level 0 加入队列</li>
+<li><strong>逐层扩散</strong>：沿 CALLS/ACCESSES 边的正向（下游）方向扩散</li>
+<li><strong>计算传播概率</strong>：每条边根据边类型计算向下游传播的概率</li>
+<li><strong>累计业务影响</strong>：每层扩散时累计业务损失</li>
+<li><strong>级联判断</strong>：当某节点影响得分超过阈值时，触发下一层扩散</li>
+<li><strong>输出影响范围</strong>：汇总所有受影响节点及其层级</li>
+</ol>
+<div class="mermaid">flowchart LR
+    subgraph 输入["输入：故障节点"]
+        FN[故障节点: svc-001]
+    end
+
+    subgraph 正向传播["正向传播引擎"]
+        Q[传播队列]
+        EXP[Expand: 获取下游邻居]
+        PROB[计算传播概率]
+        CASC[级联判断]
+        STOP[停止条件]
+    end
+
+    subgraph 输出["输出：影响范围"]
+        SCOPE[影响节点列表]
+        SUMMARY[影响范围汇总]
+        METRICS[业务损失指标]
+    end
+
+    FN --> Q --> EXP --> PROB --> CASC --> STOP --> SCOPE
+    EXP -->|扩散下一跳| Q
+    STOP --> SUMMARY
+    STOP --> METRICS
+
+    style 正向传播 fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style 输入 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style 输出 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</div><h4>3.1.2 传播方向与边类型</h4>
+<table>
+<thead>
+<tr>
+<th>边类型</th>
+<th>传播方向</th>
+<th>传播概率（默认）</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>CALLS</code></td>
+<td>A → B（A 故障影响 B）</td>
+<td>0.9（强传播）</td>
+<td>服务调用链直接传播</td>
+</tr>
+<tr>
+<td><code>ACCESSES</code></td>
+<td>A → DB（A 故障可能导致 DB 负载异常）</td>
+<td>0.7（中等传播）</td>
+<td>数据库连接池耗尽场景</td>
+</tr>
+<tr>
+<td><code>SUBSCRIBES</code></td>
+<td>Topic → Consumer（Topic 故障影响消费者）</td>
+<td>0.6</td>
+<td>消息队列故障传播</td>
+</tr>
+<tr>
+<td><code>DEPLOYED_ON</code></td>
+<td>Host → Service（Host 故障影响所有部署的服务）</td>
+<td>0.95（极高传播）</td>
+<td>基础设施故障强影响</td>
+</tr>
+<tr>
+<td><code>NETWORK_TO</code></td>
+<td>A → B（A 故障可能导致 B 网络不可达）</td>
+<td>0.3（弱传播）</td>
+<td>网络故障传播</td>
+</tr>
+</tbody></table>
+<h3>3.2 业务影响评分（Business Impact Scoring）</h3>
+<h4>3.2.1 评分流程</h4>
+<ol>
+<li><strong>节点关键性评分</strong>：对每个受影响节点计算业务关键性评分</li>
+<li><strong>传播概率加权</strong>：乘以该节点被实际影响的概率</li>
+<li><strong>层级衰减</strong>：Level 1 × 1.0，Level 2 × 0.8，Level 3 × 0.6（逐层衰减）</li>
+<li><strong>汇总输出</strong>：汇总所有受影响节点的业务影响总分</li>
+</ol>
+<h4>3.2.2 业务影响分级</h4>
+<table>
+<thead>
+<tr>
+<th>等级</th>
+<th>分数范围</th>
+<th>说明</th>
+<th>决策优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0 - 灾难级</strong></td>
+<td>&gt; 0.9</td>
+<td>核心业务完全中断，影响收入 &gt; 100万/分钟</td>
+<td>立即处理，CEO 关注</td>
+</tr>
+<tr>
+<td><strong>P1 - 严重级</strong></td>
+<td>0.7 - 0.9</td>
+<td>主要业务受损，影响收入 10-100万/分钟</td>
+<td>15分钟内处理</td>
+</tr>
+<tr>
+<td><strong>P2 - 较大级</strong></td>
+<td>0.5 - 0.7</td>
+<td>部分业务降级，影响用户体验</td>
+<td>30分钟内处理</td>
+</tr>
+<tr>
+<td><strong>P3 - 一般级</strong></td>
+<td>0.3 - 0.5</td>
+<td>非核心功能受影响</td>
+<td>2小时内处理</td>
+</tr>
+<tr>
+<td><strong>P4 - 轻微级</strong></td>
+<td>&lt; 0.3</td>
+<td>几乎无业务影响</td>
+<td>按计划处理</td>
+</tr>
+</tbody></table>
+<h3>3.3 级联故障预测（Cascade Failure Prediction）</h3>
+<h4>3.3.1 级联触发条件</h4>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>阈值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>单节点故障率</strong></td>
+<td>&gt; 80%</td>
+<td>节点本身故障概率超过阈值</td>
+</tr>
+<tr>
+<td><strong>依赖度</strong></td>
+<td>&gt; 0.9</td>
+<td>下游节点对该节点的依赖度超过 90%</td>
+</tr>
+<tr>
+<td><strong>容量阈值</strong></td>
+<td>&gt; 95%</td>
+<td>下游节点资源容量使用率超过 95%</td>
+</tr>
+<tr>
+<td><strong>时序窗口</strong></td>
+<td>&lt; 5min</td>
+<td>上游故障到下游异常的时序间隔小于 5 分钟</td>
+</tr>
+</tbody></table>
+<h4>3.3.2 级联预测输出</h4>
+<pre><code class="language-json">{
+  "cascade_risk": "HIGH",
+  "predicted_cascade_nodes": ["svc-004", "svc-005", "db-002"],
+  "predicted_cascade_depth": 3,
+  "estimated_cascade_time_min": 8,
+  "confidence": 0.82,
+  "recommendation": "建议立即扩容 svc-004 以阻止级联扩散"
+}</code></pre><h3>3.4 恢复时间估算（Recovery Time Estimation）</h3>
+<h4>3.4.1 估算逻辑</h4>
+<div class="mermaid">flowchart TB
+    subgraph 输入["输入特征"]
+        FT[fault_type]
+        FN[fault_node_type]
+        HA[historical_avg]
+        CF[current_failure_count]
+    end
+
+    subgraph 模型["MTTR 估算模型"]
+        ML[XGBoost 模型]
+    end
+
+    subgraph 输出["估算结果"]
+        EST[MTTR 估算值]
+        CI[置信区间]
+        REC[恢复建议]
+    end
+
+    FT --> ML
+    FN --> ML
+    HA --> ML
+    CF --> ML
+    ML --> EST --> CI
+    ML --> REC
+
+    style ML fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style EST fill:#c8e6c9,stroke:#388e3c,stroke-width:3px</div><h4>3.4.2 历史数据基准</h4>
+<table>
+<thead>
+<tr>
+<th>故障类型</th>
+<th>节点类型</th>
+<th>历史平均 MTTR</th>
+<th>基准来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>硬件故障</td>
+<td>Host</td>
+<td>45 分钟</td>
+<td>过去 6 个月数据</td>
+</tr>
+<tr>
+<td>软件崩溃</td>
+<td>Service</td>
+<td>8 分钟</td>
+<td>过去 6 个月数据</td>
+</tr>
+<tr>
+<td>网络中断</td>
+<td>NetworkDevice</td>
+<td>20 分钟</td>
+<td>过去 6 个月数据</td>
+</tr>
+<tr>
+<td>配置错误</td>
+<td>Middleware</td>
+<td>5 分钟</td>
+<td>过去 6 个月数据</td>
+</tr>
+<tr>
+<td>容量不足</td>
+<td>Database</td>
+<td>15 分钟</td>
+<td>过去 6 个月数据</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. API 设计规范</h2>
+<h3>4.1 REST API（同步查询）</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>路径</th>
+<th>描述</th>
+<th>请求体</th>
+<th>响应</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/impact/analyze</code></td>
+<td>发起影响分析任务</td>
+<td>FaultContext</td>
+<td>ImpactReport</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/report/{incident_id}</code></td>
+<td>查询影响范围报告</td>
+<td>——</td>
+<td>ImpactReport</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/scope/{node_id}</code></td>
+<td>查询节点的影响范围</td>
+<td><code>?depth=3&amp;include_critical=true</code></td>
+<td>ImpactScope</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/cascade/{incident_id}</code></td>
+<td>查询级联故障预测</td>
+<td>——</td>
+<td>CascadeForecast</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/mttr/{incident_id}</code></td>
+<td>查询 MTTR 估算</td>
+<td>——</td>
+<td>MTTREstimate</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/business-loss/{incident_id}</code></td>
+<td>查询业务损失估算</td>
+<td>——</td>
+<td>BusinessLossReport</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/impact/critical-nodes</code></td>
+<td>查询所有核心业务节点列表</td>
+<td>——</td>
+<td>CriticalNode[]</td>
+</tr>
+</tbody></table>
+<h3>4.2 gRPC API（高性能场景）</h3>
+<table>
+<thead>
+<tr>
+<th>服务</th>
+<th>方法</th>
+<th>适用场景</th>
+<th>性能要求</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ImpactService</code></td>
+<td><code>ComputeImpactScope(ImpactRequest)</code></td>
+<td>实时影响范围计算（根因分析触发）</td>
+<td>P99 &lt; 500ms</td>
+</tr>
+<tr>
+<td><code>ImpactService</code></td>
+<td><code>PredictCascade(CascadeRequest)</code></td>
+<td>级联故障预测</td>
+<td>P99 &lt; 1s</td>
+</tr>
+<tr>
+<td><code>ImpactService</code></td>
+<td><code>StreamImpactUpdate(StreamRequest)</code></td>
+<td>流式推送影响范围更新</td>
+<td>&lt; 100ms 延迟</td>
+</tr>
+</tbody></table>
+<h3>4.3 Kafka 事件（异步通知）</h3>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>事件类型</th>
+<th>发布者</th>
+<th>订阅者</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>impact.report.completed</code></td>
+<td>影响分析报告完成</td>
+<td>影响分析模块</td>
+<td>智能决策/Dashboard</td>
+<td>推送影响范围到下游</td>
+</tr>
+<tr>
+<td><code>impact.cascade.alert</code></td>
+<td>级联故障预警</td>
+<td>影响分析模块</td>
+<td>告警系统/值班人员</td>
+<td>级联风险超过阈值时发布</td>
+</tr>
+<tr>
+<td><code>impact.business-loss.updated</code></td>
+<td>业务损失更新</td>
+<td>影响分析模块</td>
+<td>Dashboard（实时更新）</td>
+<td>业务损失随时间累积推送</td>
+</tr>
+</tbody></table>
+<h3>4.4 API 质量指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>SLO 目标</th>
+<th>告警阈值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P99 延迟</strong></td>
+<td>&lt; 500ms</td>
+<td>&gt; 1s</td>
+<td>影响范围计算完成时间</td>
+</tr>
+<tr>
+<td><strong>影响范围准确率</strong></td>
+<td>&gt; 90%</td>
+<td>&lt; 80%</td>
+<td>预测影响节点与实际受影响节点重合率</td>
+</tr>
+<tr>
+<td><strong>MTTR 估算准确率</strong></td>
+<td>&gt; 85%</td>
+<td>&lt; 75%</td>
+<td>MTTR 估算值与实际恢复时间偏差 &lt; 20%</td>
+</tr>
+<tr>
+<td><strong>可用率</strong></td>
+<td>99.9%</td>
+<td>&lt; 99.5%</td>
+<td>月度可用率</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. 数据流架构</h2>
+<h3>5.1 整体数据流</h3>
+<div class="mermaid">flowchart LR
+    subgraph 输入["输入数据源"]
+        RCA[07 根因分析
+故障节点]
+        T[02 拓扑建模
+拓扑图谱]
+        BM[业务模型
+业务权重]
+    end
+
+    subgraph 处理["影响分析处理管道"]
+        PROP[正向传播引擎
+Propagator]
+        BSCORE[业务评分器
+Business Scorer]
+        CASCADE[级联预测器
+Cascade Predictor]
+        MTTR[恢复时间估算器
+Recovery Estimator]
+        LOSS[业务损失评估器
+Loss Evaluator]
+    end
+
+    subgraph 输出["输出"]
+        IREPORT[影响范围报告
+智能决策]
+        CFORECAST[级联预测
+告警系统]
+        BLOSS[业务损失
+Dashboard]
+        MTTRR[MTTR 估算
+Dashboard]
+    end
+
+    RCA --> PROP
+    T --> PROP
+    PROP --> BSCORE
+    BSCORE --> IREPORT
+    PROP --> CASCADE --> CFORECAST
+    T --> MTTR --> MTTRR
+    BSCORE --> LOSS --> BLOSS
+
+    style 处理 fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style 输入 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style 输出 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</div><h3>5.2 影响分析流程</h3>
+<div class="mermaid">flowchart TB
+    subgraph Step1["Step 1: 接收故障上下文"]
+        R1[接收故障节点
+root_cause_node]
+    end
+
+    subgraph Step2["Step 2: 正向传播计算"]
+        R2[初始化传播队列]
+        R3[逐层扩散，
+计算传播概率]
+        R4[达到最大深度或
+传播概率 < 阈值停止]
+    end
+
+    subgraph Step3["Step 3: 业务评分"]
+        R5[计算每个受影响节点的
+业务关键性评分]
+        R6[计算传播概率加权后的
+业务影响得分]
+        R7[按影响等级分类]
+    end
+
+    subgraph Step4["Step 4: 级联预测"]
+        R8[判断级联触发条件]
+        R9[预测级联扩散节点和深度]
+    end
+
+    subgraph Step5["Step 5: 损失估算"]
+        R10[估算 MTTR]
+        R11[计算业务损失金额]
+        R12[生成影响报告]
+    end
+
+    R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8 --> R9 --> R10 --> R11 --> R12
+
+    style Step1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Step2 fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style Step3 fill:#fce4ec,stroke:#c62828,stroke-width:2px
+    style Step4 fill:#ede7f6,stroke:#7b1fa2,stroke-width:2px
+    style Step5 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</div><h3>5.3 与根因分析的数据协同</h3>
+<div class="mermaid">flowchart LR
+    subgraph 故障事件["故障事件"]
+        INC[故障事件
+Incident]
+    end
+
+    subgraph RCA["07 根因分析"]
+        RCA1[逆向传播
+找根因]
+        RCA2[RCA 结论
+root_cause_node]
+    end
+
+    subgraph IA["08 影响分析"]
+        IA1[正向传播
+算影响]
+        IA2[影响范围
+impact_scope]
+    end
+
+    subgraph 决策["09 智能决策"]
+        DEC[综合 RCA + Impact
+制定决策]
+    end
+
+    INC --> RCA1 --> RCA2 --> IA1 --> IA2 --> DEC
+
+    style RCA fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style IA fill:#fff9c4,stroke:#f9a825,stroke-width:3px
+    style 决策 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</div><hr>
+<h2>6. 模块协作关系</h2>
+<h3>6.1 依赖矩阵</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>依赖影响分析的什么</th>
+<th>依赖类型</th>
+<th>接口方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>02 拓扑建模</strong></td>
+<td>拓扑图谱（节点/边查询）用于正向传播</td>
+<td>数据依赖</td>
+<td>gRPC 高性能查询</td>
+</tr>
+<tr>
+<td><strong>07 根因分析</strong></td>
+<td>故障节点输入（触发影响分析）</td>
+<td>数据依赖</td>
+<td>Kafka 事件订阅</td>
+</tr>
+<tr>
+<td><strong>09 智能决策</strong></td>
+<td>影响范围报告（决策输入之一）</td>
+<td>数据依赖</td>
+<td>Kafka 事件订阅</td>
+</tr>
+<tr>
+<td><strong>Dashboard</strong></td>
+<td>影响范围可视化、业务损失实时更新</td>
+<td>数据依赖</td>
+<td>REST 查询</td>
+</tr>
+<tr>
+<td><strong>告警系统</strong></td>
+<td>级联故障预警（高优先级告警）</td>
+<td>数据依赖</td>
+<td>Kafka 事件订阅</td>
+</tr>
+</tbody></table>
+<h3>6.2 输出接口契约</h3>
+<h4>6.2.1 影响范围报告格式</h4>
+<pre><code class="language-json">{
+  "report_id": "imp-20260607-001",
+  "incident_id": "inc-20260607-042",
+  "fault_node": {
+    "id": "svc-001",
+    "name": "payment-service"
+  },
+  "impact_scope": {
+    "total_affected": 23,
+    "by_label": {
+      "Service": 12,
+      "Database": 4,
+      "Middleware": 3,
+      "Host": 4
+    },
+    "by_level": {
+      "1": 5,
+      "2": 8,
+      "3": 7,
+      "4": 3
+    },
+    "critical_count": 8,
+    "max_depth": 4
+  },
+  "business_impact_score": 0.78,
+  "impact_level": "P1",
+  "estimated_mttr_min": 25,
+  "business_loss_per_min": 35000,
+  "cascade_risk": "MEDIUM",
+  "generated_at": "2026-06-07T08:16:00Z"
+}</code></pre><h4>6.2.2 级联预测格式</h4>
+<pre><code class="language-json">{
+  "cascade_risk": "HIGH",
+  "predicted_cascade_nodes": [
+    { "id": "svc-004", "depth": 2, "probability": 0.88 },
+    { "id": "svc-005", "depth": 2, "probability": 0.82 },
+    { "id": "db-002", "depth": 3, "probability": 0.75 }
+  ],
+  "estimated_cascade_time_min": 12,
+  "confidence": 0.79,
+  "recommendation": "建议立即扩容以阻止级联"
+}</code></pre><hr>
+<h2>7. 量化指标体系</h2>
+<h3>7.1 准确性指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>描述</th>
+<th>基线（当前）</th>
+<th>目标</th>
+<th>测量方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>影响范围准确率</strong></td>
+<td>预测影响节点与实际受影响节点的重合率</td>
+<td>78%</td>
+<td>&gt; 90%</td>
+<td>故障后人工核实</td>
+</tr>
+<tr>
+<td><strong>MTTR 估算准确率</strong></td>
+<td>MTTR 估算值与实际恢复时间偏差 &lt; 20% 的比例</td>
+<td>75%</td>
+<td>&gt; 85%</td>
+<td>历史故障统计</td>
+</tr>
+<tr>
+<td><strong>级联预测准确率</strong></td>
+<td>级联预测节点实际发生级联的比例</td>
+<td>65%</td>
+<td>&gt; 80%</td>
+<td>历史级联故障统计</td>
+</tr>
+<tr>
+<td><strong>业务损失估算准确率</strong></td>
+<td>业务损失估算值与实际损失偏差</td>
+<td>70%</td>
+<td>&gt; 85%</td>
+<td>财务核实</td>
+</tr>
+</tbody></table>
+<h3>7.2 性能质量指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>描述</th>
+<th>SLO 目标</th>
+<th>告警阈值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P99 延迟</strong></td>
+<td>影响范围计算完成时间</td>
+<td>&lt; 500ms</td>
+<td>&gt; 1s</td>
+</tr>
+<tr>
+<td><strong>级联预测延迟</strong></td>
+<td>级联预测计算时间</td>
+<td>&lt; 1s</td>
+<td>&gt; 3s</td>
+</tr>
+<tr>
+<td><strong>最大传播深度</strong></td>
+<td>单次分析可达最大传播深度</td>
+<td>10 跳</td>
+<td>&lt; 5 跳</td>
+</tr>
+<tr>
+<td><strong>并发分析能力</strong></td>
+<td>同时处理的影响分析任务数</td>
+<td>50</td>
+<td>&lt; 20</td>
+</tr>
+</tbody></table>
+<h3>7.3 业务价值指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>描述</th>
+<th>当前</th>
+<th>目标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>故障决策效率提升</strong></td>
+<td>影响分析辅助决策，减少人工评估时间</td>
+<td>基准</td>
+<td>+40%</td>
+</tr>
+<tr>
+<td><strong>级联故障预警覆盖率</strong></td>
+<td>级联故障发生前被预警的比例</td>
+<td>55%</td>
+<td>&gt; 80%</td>
+</tr>
+<tr>
+<td><strong>业务损失减少</strong></td>
+<td>快速影响评估减少故障持续时间，节省业务损失</td>
+<td>基准</td>
+<td>-25%</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. 部署架构</h2>
+<h3>8.1 K8s 部署拓扑</h3>
+<div class="mermaid">flowchart LR
+    subgraph 控制面["控制面"]
+        API[API Server]
+    end
+
+    subgraph 计算层["计算层"]
+        subgraph 服务["Impact 服务 StatefulSet"]
+            IA1[Impact Service x2]
+        end
+        subgraph 工作器["传播引擎 Worker"]
+            WORK1[Propagator x3]
+        end
+    end
+
+    subgraph 存储层["存储层"]
+        NEO[(Neo4j
+拓扑查询)]
+        RD[(Redis
+结果缓存)]
+        KF[(Kafka
+事件总线)]
+    end
+
+    RCA[07 根因分析] -->|Kafka| IA1
+    T[02 拓扑建模] -->|gRPC| NEO -->|查询| IA1
+    IA1 -->|写入| RD
+    IA1 -->|发布| KF
+    KF -->|订阅| 09 智能决策
+
+    style 计算层 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style 存储层 fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style IA1 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px</div><h3>8.2 资源配置</h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>副本数</th>
+<th>CPU</th>
+<th>内存</th>
+<th>存储</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Impact Service</strong></td>
+<td>2（主备）</td>
+<td>4 核</td>
+<td>8 GB</td>
+<td>——</td>
+<td>StatefulSet，接收分析请求</td>
+</tr>
+<tr>
+<td><strong>Propagator Worker</strong></td>
+<td>3（并行）</td>
+<td>2 核</td>
+<td>4 GB</td>
+<td>——</td>
+<td>执行正向传播计算</td>
+</tr>
+<tr>
+<td><strong>CascadePredictor</strong></td>
+<td>2</td>
+<td>4 核</td>
+<td>8 GB</td>
+<td>——</td>
+<td>ML 模型推理（GPU 支持）</td>
+</tr>
+<tr>
+<td><strong>Neo4j</strong></td>
+<td>1 主 + 2 从</td>
+<td>8 核</td>
+<td>32 GB</td>
+<td>200 GB SSD</td>
+<td>拓扑查询</td>
+</tr>
+<tr>
+<td><strong>Redis Cluster</strong></td>
+<td>3 节点</td>
+<td>2 核</td>
+<td>8 GB</td>
+<td>——</td>
+<td>影响范围缓存</td>
+</tr>
+</tbody></table>
+<h3>8.3 高可用设计</h3>
+<ul>
+<li><strong>服务多副本</strong>：Impact Service 部署 2 副本，Kubernetes 自动负载均衡</li>
+<li><strong>工作器并行</strong>：Propagator Worker 3 副本，并行处理不同故障</li>
+<li><strong>结果缓存</strong>：影响范围结果缓存 Redis，5 分钟内相同节点直接返回</li>
+<li><strong>降级策略</strong>：ML 预测超时降级为规则预测，保证分析完成</li>
+<li><strong>事件持久化</strong>：Kafka 事件持久化，下游消费失败重试</li>
+</ul>
+<hr>
+<h2>9. 本章小结</h2>
+<h3>9.1 核心要点</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>核心要点</th>
+<th>量化目标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>定位</strong></td>
+<td>能力层核心模块，正向传播从故障到影响范围，业务损失为导向</td>
+<td>——</td>
+</tr>
+<tr>
+<td><strong>模型</strong></td>
+<td>影响范围模型 + 业务关键性评分 + MTTR 估算，3 大模型支撑</td>
+<td>影响范围准确率 &gt; 90%</td>
+</tr>
+<tr>
+<td><strong>能力</strong></td>
+<td>正向传播 + 业务评分 + 级联预测 + 恢复估算 + 损失评估 5 大能力</td>
+<td>MTTR 估算准确率 &gt; 85%</td>
+</tr>
+<tr>
+<td><strong>接口</strong></td>
+<td>REST + gRPC + Kafka，输出影响报告到智能决策和 Dashboard</td>
+<td>P99 &lt; 500ms</td>
+</tr>
+<tr>
+<td><strong>质量</strong></td>
+<td>影响范围准确率 / MTTR 准确率 / 级联预测准确率 / 业务损失准确率</td>
+<td>级联预警覆盖率 &gt; 80%</td>
+</tr>
+</tbody></table>
+<h3>9.2 关键成功要素</h3>
+<table>
+<thead>
+<tr>
+<th>要素</th>
+<th>优先级</th>
+<th>实施策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>传播算法优化</strong></td>
+<td>P0</td>
+<td>拓扑查询性能优化，传播引擎并行化，深度扩展</td>
+</tr>
+<tr>
+<td><strong>业务权重数据</strong></td>
+<td>P0</td>
+<td>打通告警/业务系统，建立业务关键性评分数据</td>
+</tr>
+<tr>
+<td><strong>级联预测模型</strong></td>
+<td>P1</td>
+<td>收集历史级联故障数据，训练级联预测模型</td>
+</tr>
+<tr>
+<td><strong>MTTR 历史数据</strong></td>
+<td>P1</td>
+<td>建立故障类型与恢复时间的映射关系</td>
+</tr>
+<tr>
+<td><strong>实时损失计算</strong></td>
+<td>P2</td>
+<td>业务损失随时间实时更新，推送 Dashboard</td>
+</tr>
+</tbody></table>
+<h3>9.3 与其他模块的边界</h3>
+<table>
+<thead>
+<tr>
+<th>边界</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>vs 07 根因分析</strong></td>
+<td>根因分析做逆向传播「找根因」，影响分析做正向传播「算影响」，两者互补，共同构成完整故障分析视图</td>
+</tr>
+<tr>
+<td><strong>vs 02 拓扑建模</strong></td>
+<td>影响分析依赖拓扑建模的图结构做正向传播，但自己做「业务评分」和「损失估算」</td>
+</tr>
+<tr>
+<td><strong>vs 09 智能决策</strong></td>
+<td>影响分析输出「影响范围和业务损失」，智能决策决定「是否执行动作、执行顺序」，影响分析不决策只评估</td>
+</tr>
+<tr>
+<td><strong>vs Dashboard</strong></td>
+<td>影响分析提供数据，Dashboard 负责展示和交互，两者通过 REST/Kafka 交互</td>
+</tr>
+</tbody></table>
+<p><strong>记忆口诀：</strong></p>
+<blockquote>
+<p><strong>正向传播算影响，业务权重来打分；级联预测早预警，恢复时间心中有数；损失随时间累积，智能决策来接力。</strong></p>
+</blockquote>
+<hr>
+<blockquote>
+<p>本章定义了模块 08 影响分析的详细功能设计规范。影响分析从故障节点出发，计算下游影响范围、业务损失和恢复时间，为智能决策提供 Impact 维度的关键输入。</p>
+</blockquote>
+<p><em>文档版本：V1.0 | 更新日期：2026-06-07</em></p>
+
+      </article>
+    </main>
+  </div>
+
+  <script>
+    // Accordion sidebar: only one section open at a time
+    document.querySelectorAll('.sidebar-section-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const items = header.nextElementSibling;
+        const isOpen = items.classList.contains('open');
+        // Close all sections first
+        document.querySelectorAll('.sidebar-section-items').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.sidebar-section-header').forEach(el => el.classList.remove('open'));
+        // Open clicked section only if it was closed
+        if (!isOpen) {
+          items.classList.add('open');
+          header.classList.add('open');
+        }
+      });
+    });
+
+    // Open current page's section; highlight active link
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+      if (link.getAttribute('href') === currentPath) {
+        link.classList.add('active');
+        const section = link.closest('.sidebar-section-items');
+        const header = section ? section.previousElementSibling : null;
+        if (section) section.classList.add('open');
+        if (header) header.classList.add('open');
+      }
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+          const text = link.textContent.toLowerCase();
+          const li = link.closest('li');
+          li.style.display = (query === '' || text.includes(query)) ? '' : 'none';
+        });
+        document.querySelectorAll('.sidebar-section-items').forEach(section => {
+          const hasVisible = section.querySelectorAll('li:not([style*="display: none"])').length > 0;
+          const header = section.previousElementSibling;
+          if (hasVisible || query === '') {
+            section.classList.add('open');
+            header.classList.add('open');
+          }
+        });
+      });
+    }
+
+    // Mobile toggle
+    document.querySelector('.sidebar-toggle')?.addEventListener('click', () => {
+      document.querySelector('.sidebar').classList.toggle('open');
+    });
+
+    // Mermaid: Load dynamically
+    (function() {
+      const mermaidDivs = document.querySelectorAll('.mermaid');
+      if (mermaidDivs.length === 0) return;
+
+      const cdns = [
+        '/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js',
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js'
+      ];
+      let cdnIndex = 0;
+
+      function showError(msg) {
+        mermaidDivs.forEach(div => {
+          div.innerHTML = '<div class="mermaid-error" style="padding:16px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:20px 0;">' + msg + '</div>';
+          div.classList.add('rendered');
+        });
+      }
+
+      function tryLoadMermaid() {
+        if (cdnIndex >= cdns.length) {
+          showError('❌ 无法加载图表库，请检查网络连接后刷新页面');
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = cdns[cdnIndex];
+        script.onload = function() {
+          if (typeof mermaid === 'undefined') {
+            showError('❌ 图表库加载失败');
+            return;
+          }
+          try {
+            mermaid.run({
+              querySelector: '.mermaid',
+              startOnLoad: false,
+              theme: 'base',
+              themeVariables: {
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+                primaryColor: '#4f46e5',
+                primaryTextColor: '#1e293b',
+                primaryBorderColor: '#4f46e5',
+                lineColor: '#64748b',
+                secondaryColor: '#f1f5f9',
+                tertiaryColor: '#f8fafc',
+              },
+              securityLevel: 'loose',
+              flowchart: { curve: 'basis', padding: 15, nodeSpacing: 50, rankSpacing: 80 },
+              maxTextSize: 50000,
+            });
+            mermaidDivs.forEach(div => div.classList.add('rendered'));
+          } catch(e) {
+            showError('❌ 图表渲染失败: ' + e.message);
+          }
+        };
+        script.onerror = function() { cdnIndex++; tryLoadMermaid(); };
+        document.head.appendChild(script);
+      }
+      tryLoadMermaid();
+    })();
+  </script>
+</body>
+</html>

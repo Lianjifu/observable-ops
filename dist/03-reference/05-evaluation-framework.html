@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3.5 评估框架与落地检查清单</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 62.5%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 15px;
+      color: #1e293b;
+      line-height: 1.7;
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== Section Color Themes ===== */
+    .sidebar-section[data-section="1"] { --section-clr: #4f46e5; --section-bg: rgba(79,70,229,0.08); --section-bg-hover: rgba(79,70,229,0.12); --section-light: #eef2ff; }
+    .sidebar-section[data-section="2"] { --section-clr: #0d9488; --section-bg: rgba(13,148,136,0.08); --section-bg-hover: rgba(13,148,136,0.12); --section-light: #f0fdfa; }
+    .sidebar-section[data-section="3"] { --section-clr: #d97706; --section-bg: rgba(217,119,6,0.08); --section-bg-hover: rgba(217,119,6,0.12); --section-light: #fffbeb; }
+
+    /* ===== Layout ===== */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ===== Sidebar ===== */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #f8fafc;
+      border-right: 1px solid #e2e8f0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
+      padding: 20px 20px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand .icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* --- Search --- */
+    .sidebar-search {
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box:focus-within {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: #1e293b;
+      background: transparent;
+    }
+    .search-box input::placeholder { color: #94a3b8; }
+    .search-box svg { width: 15px; height: 15px; color: #94a3b8; flex-shrink: 0; }
+
+    /* --- Quick Links --- */
+    /* --- Scrollable Nav Area --- */
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 12px;
+    }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    .sidebar-nav ul, .sidebar-nav li { list-style: none; }
+
+    /* --- Section Header (collapsible toggle) --- */
+    .sidebar-section { margin-bottom: 2px; }
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .sidebar-section-header:hover { background: rgba(0,0,0,0.04); }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .section-num {
+      width: 22px; height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--section-clr, #4f46e5);
+      flex-shrink: 0;
+    }
+    .section-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-section-header .arrow {
+      width: 16px; height: 16px;
+      color: #94a3b8;
+      flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+    .sidebar-section-header.open .arrow {
+      transform: rotate(90deg);
+      color: var(--section-clr, #4f46e5);
+    }
+
+    /* --- Section Items (collapsible content) --- */
+    .sidebar-section-items {
+      display: none;
+    }
+    .sidebar-section-items.open {
+      display: block;
+    }
+    .sidebar-section-items > ul {
+      padding: 0 8px 0;
+    }
+    .sidebar-section-items li { margin: 1px 0; }
+    .sidebar-section-items a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: #64748b;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      margin-left: 2px;
+    }
+    .sidebar-section-items a:hover {
+      color: #1e293b;
+      background: rgba(0,0,0,0.03);
+      border-left-color: #cbd5e1;
+    }
+    .sidebar-section-items a.active {
+      color: var(--section-clr, #4f46e5);
+      background: var(--section-bg, rgba(79,70,229,0.08));
+      border-left-color: var(--section-clr, #4f46e5);
+      font-weight: 500;
+    }
+    .sidebar-section-items a .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .sidebar-section-items a:hover .dot { background: #94a3b8; }
+    .sidebar-section-items a.active .dot { background: var(--section-clr, #4f46e5); }
+
+    /* --- External Links --- */
+    .sidebar-footer {
+      padding: 8px 14px 14px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      flex-shrink: 0;
+    }
+    .sidebar-footer a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .sidebar-footer a:hover { border-color: #4f46e5; color: #4f46e5; background: #eef2ff; }
+    .sidebar-footer a svg { width: 15px; height: 15px; opacity: 0.5; }
+
+    /* ===== Content ===== */
+    .content {
+      flex: 1;
+      margin-left: 280px;
+      padding: 48px 64px;
+      min-height: 100vh;
+      max-width: 1400px;
+    }
+
+    /* ===== Typography ===== */
+    .markdown-section h1 {
+      font-size: 28px; font-weight: 700; color: #0f172a;
+      letter-spacing: -0.02em; margin: 0 0 24px;
+      padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;
+    }
+    .markdown-section h2 { font-size: 20px; font-weight: 600; color: #1e293b; letter-spacing: -0.01em; margin: 40px 0 16px; }
+    .markdown-section h3 { font-size: 16px; font-weight: 600; color: #4f46e5; margin: 28px 0 12px; }
+    .markdown-section h4 { font-size: 15px; font-weight: 600; color: #1e293b; margin: 20px 0 8px; }
+    .markdown-section p { margin: 12px 0; color: #475569; }
+    .markdown-section a { color: #4f46e5; text-decoration: none; font-weight: 500; }
+    .markdown-section a:hover { text-decoration: underline; }
+    .markdown-section code {
+      background: #f1f5f9; color: #0f172a;
+      padding: 2px 6px; font-size: 13px;
+      border-radius: 4px; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
+    }
+    .markdown-section pre { background: #1e293b; border-radius: 12px; padding: 20px 24px; overflow-x: auto; margin: 20px 0; }
+    .markdown-section pre code { background: transparent; color: #e2e8f0; padding: 0; font-size: 13px; line-height: 1.6; }
+    .markdown-section blockquote {
+      background: #f8fafc; border-left: 4px solid #4f46e5;
+      border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0;
+    }
+    .markdown-section blockquote p { margin: 0; color: #475569; }
+    .markdown-section table {
+      width: 100%; border-collapse: collapse; margin: 20px 0;
+      font-size: 14px; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .markdown-section table th { background: #f8fafc; font-weight: 600; text-align: left; padding: 12px 16px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .markdown-section table td { padding: 12px 16px; border-top: 1px solid #e2e8f0; }
+    .markdown-section table tr:nth-child(2n) td { background: #f8fafc; }
+    .markdown-section ul, .markdown-section ol { padding-left: 24px; margin: 12px 0; }
+    .markdown-section li { margin: 6px 0; color: #475569; }
+    .markdown-section hr { height: 1px; background: #e2e8f0; border: none; margin: 32px 0; }
+    .markdown-section img { max-width: 100%; height: auto; border-radius: 8px; }
+
+    /* ===== Section Callout ===== */
+    .markdown-section .section-callout {
+      background: linear-gradient(135deg, rgba(79,70,229,0.04) 0%, rgba(124,58,237,0.04) 100%);
+      border-left: 4px solid #4f46e5; border-radius: 0 12px 12px 0;
+      padding: 18px 24px 22px; margin: 8px 0 28px;
+    }
+    .markdown-section .section-callout blockquote {
+      background: rgba(79,70,229,0.07); border: none; border-radius: 8px;
+      padding: 10px 14px; margin: 0 0 16px; font-size: 14px; color: #1e293b;
+    }
+    .markdown-section .section-callout blockquote p { margin: 0; color: #1e293b; }
+    .markdown-section .section-callout h4 { color: #4f46e5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 18px 0 10px; }
+    .markdown-section .section-callout h4:first-of-type { margin-top: 0; }
+    .markdown-section .section-callout ol { list-style: none; counter-reset: callout-item; padding: 0; margin: 0 0 12px; }
+    .markdown-section .section-callout ol li {
+      counter-increment: callout-item; padding: 8px 0 8px 40px;
+      position: relative; color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0;
+    }
+    .markdown-section .section-callout ol li::before {
+      content: counter(callout-item);
+      position: absolute; left: 0; top: 7px;
+      width: 26px; height: 26px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff; border-radius: 50%; text-align: center;
+      line-height: 26px; font-size: 12px; font-weight: 700;
+    }
+    .markdown-section .section-callout table { margin: 8px 0 4px; font-size: 13px; }
+    .markdown-section .section-callout table th { background: rgba(79,70,229,0.08); color: #4f46e5; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .markdown-section .section-callout table th,
+    .markdown-section .section-callout table td { padding: 8px 12px; }
+
+    /* ===== Mermaid ===== */
+    .mermaid { background: #f8fafc; border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; border: 1px solid #e2e8f0; display: block; }
+    .mermaid.rendered { display: block; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    .mermaid-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; color: #dc2626; margin: 20px 0; }
+    .mermaid-loading { background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 12px; padding: 24px; margin: 20px 0; color: #64748b; text-align: center; }
+
+    /* ===== Navigation ===== */
+    .nav { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+    .nav a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 18px; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; color: #475569; text-decoration: none;
+      font-size: 14px; font-weight: 500; transition: all 0.15s;
+    }
+    .nav a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    /* ===== Mobile ===== */
+    .sidebar-toggle {
+      display: none; position: fixed; top: 12px; left: 12px; z-index: 100;
+      background: white; border: 1px solid #e2e8f0; color: #1e293b;
+      width: 38px; height: 38px; border-radius: 8px; cursor: pointer;
+      font-size: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      align-items: center; justify-content: center;
+    }
+    @media (max-width: 1024px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-toggle { display: flex; }
+      .content { margin-left: 0; padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <button class="sidebar-toggle">☰</button>
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <a href="/index.html" class="sidebar-brand">
+          <span class="icon">📚</span>
+          智能系统运维可观测性
+        </a>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="搜索文档..." id="searchInput">
+        </div>
+      </div>
+
+      <div class="sidebar-nav">
+        <div class="sidebar-section" data-section="1">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">1</span>
+            <span class="section-name">业务流程</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/01-intro/01-product-overview.html"><span class="dot"></span>业务 01 · 产品概述</a></li><li><a href="/01-intro/02-topology-modeling.html"><span class="dot"></span>业务 02 · 拓扑建模</a></li><li><a href="/01-intro/03-data-fusion.html"><span class="dot"></span>业务 03 · 数据融合</a></li><li><a href="/01-intro/04-intelligent-sensing.html"><span class="dot"></span>业务 04 · 智能感知</a></li><li><a href="/01-intro/05-cognitive-network.html"><span class="dot"></span>业务 05 · 认知网络</a></li><li><a href="/01-intro/06-fault-analysis.html"><span class="dot"></span>业务 06 · 故障分析</a></li><li><a href="/01-intro/07-root-cause.html"><span class="dot"></span>业务 07 · 根因定位</a></li><li><a href="/01-intro/08-impact-analysis.html"><span class="dot"></span>业务 08 · 影响分析</a></li><li><a href="/01-intro/09-intelligent-decision.html"><span class="dot"></span>业务 09 · 智能决策</a></li><li><a href="/01-intro/10-auto-execution.html"><span class="dot"></span>业务 10 · 自动执行</a></li><li><a href="/01-intro/11-knowledge-evolution.html"><span class="dot"></span>业务 11 · 知识演进</a></li></ul></div></div><div class="sidebar-section" data-section="2">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">2</span>
+            <span class="section-name">功能逻辑</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/02-architecture/01-module-architecture.html"><span class="dot"></span>模块 01 · 总体架构</a></li><li><a href="/02-architecture/02-topology-modeling.html"><span class="dot"></span>模块 02 · 拓扑建模</a></li><li><a href="/02-architecture/03-data-fusion.html"><span class="dot"></span>模块 03 · 数据融合</a></li><li><a href="/02-architecture/04-intelligent-sensing.html"><span class="dot"></span>模块 04 · 智能感知</a></li><li><a href="/02-architecture/05-cognitive-network.html"><span class="dot"></span>模块 05 · 认知网络</a></li><li><a href="/02-architecture/06-fault-diagnosis.html"><span class="dot"></span>模块 06 · 故障研判</a></li><li><a href="/02-architecture/07-root-cause.html"><span class="dot"></span>模块 07 · 根因分析</a></li><li><a href="/02-architecture/08-impact-analysis.html"><span class="dot"></span>模块 08 · 影响分析</a></li><li><a href="/02-architecture/09-intelligent-decision.html"><span class="dot"></span>模块 09 · 智能决策</a></li><li><a href="/02-architecture/10-auto-execution.html"><span class="dot"></span>模块 10 · 自动执行</a></li><li><a href="/02-architecture/11-knowledge-evolution.html"><span class="dot"></span>模块 11 · 知识进化</a></li></ul></div></div><div class="sidebar-section" data-section="3">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">3</span>
+            <span class="section-name">参考资料</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/03-reference/01-foundation.html"><span class="dot"></span>参考 01 · AIOps 基础与标准</a></li><li><a href="/03-reference/02-root-cause-reasoning.html"><span class="dot"></span>参考 02 · 根因推理算法</a></li><li><a href="/03-reference/03-knowledge-graph.html"><span class="dot"></span>参考 03 · 知识图谱技术</a></li><li><a href="/03-reference/04-sre-agents.html"><span class="dot"></span>参考 04 · SRE Agent 架构</a></li><li><a href="/03-reference/05-evaluation-framework.html"><span class="dot"></span>参考 05 · 评估框架与落地</a></li></ul></div></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="https://github.com" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </nav>
+
+    <main class="content">
+      <article class="markdown-section">
+        <h1>3.5 评估框架与落地检查清单</h1>
+<blockquote>
+<p>本章节为方案评估和落地提供量化框架，覆盖 SLO/SLI 设计、效果评估指标、ROI 计算器、错误预算管理、风险评估矩阵以及各模块落地检查清单。</p>
+</blockquote>
+<hr>
+<h2>1. SLO/SLI 设计</h2>
+<h3>1.1 核心概念</h3>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>定义</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SLI</strong>（服务等级指标）</td>
+<td>实际测量的服务质量</td>
+<td>请求延迟、可用率、错误率</td>
+</tr>
+<tr>
+<td><strong>SLO</strong>（服务等级目标）</td>
+<td>目标服务质量</td>
+<td>P99 &lt; 200ms、可用率 &gt; 99.9%</td>
+</tr>
+<tr>
+<td><strong>SLA</strong>（服务等级协议）</td>
+<td>与客户的书面协议</td>
+<td>99.95% 可用率 + 赔偿条款</td>
+</tr>
+<tr>
+<td><strong>错误预算</strong></td>
+<td>允许的故障时间</td>
+<td>99.9% SLO → 每月 43min 错误预算</td>
+</tr>
+</tbody></table>
+<h3>1.2 本方案 SLO 目标</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>指标</th>
+<th>目标值</th>
+<th>当前行业水平</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1分钟发现</strong></td>
+<td>MTTD</td>
+<td>&lt; 1 分钟</td>
+<td>5 分钟</td>
+</tr>
+<tr>
+<td><strong>5分钟定位</strong></td>
+<td>MTTR</td>
+<td>&lt; 5 分钟</td>
+<td>30 分钟</td>
+</tr>
+<tr>
+<td><strong>10分钟恢复</strong></td>
+<td>平均恢复时间</td>
+<td>&lt; 10 分钟</td>
+<td>2 小时</td>
+</tr>
+<tr>
+<td><strong>告警准确率</strong></td>
+<td>Precision</td>
+<td>&gt; 80%</td>
+<td>30%</td>
+</tr>
+<tr>
+<td><strong>根因准确率</strong></td>
+<td>Hit Rate@3</td>
+<td>&gt; 80%</td>
+<td>50%</td>
+</tr>
+<tr>
+<td><strong>自动化率</strong></td>
+<td>自动修复占比</td>
+<td>&gt; 80%</td>
+<td>20%</td>
+</tr>
+</tbody></table>
+<h3>1.3 SLI 采集规范</h3>
+<pre><code class="language-python">def calculate_availability(window='30d'):
+    """可用率 SLI"""
+    good_events = query("""
+        SELECT count(*) FROM events
+        WHERE status='resolved'
+        AND duration &lt; 5min
+        AND timestamp &gt; now() - {window}
+    """)
+    total_events = query("""
+        SELECT count(*) FROM events
+        WHERE timestamp &gt; now() - {window}
+    """)
+    return good_events / total_events if total_events &gt; 0 else 1.0
+
+def calculate_latency_p99(window='1h'):
+    """延迟 SLI (P99)"""
+    latencies = query("""
+        SELECT latency_ms FROM request_metrics
+        WHERE timestamp &gt; now() - {window}
+        ORDER BY latency_ms
+    """)
+    return np.percentile(latencies, 99)</code></pre><hr>
+<h2>2. 错误预算管理</h2>
+<h3>2.1 错误预算消耗与告警</h3>
+<div class="mermaid">flowchart LR
+    subgraph 消耗["错误预算消耗"]
+        B[月度错误预算
+43 min] --> U[已消耗
+15 min]
+        B --> R[剩余
+28 min]
+    end
+
+    subgraph 阈值["告警阈值"]
+        T1[消耗 50%
+21.5 min
+→ 观察]
+        T2[消耗 70%
+30 min
+→ 告警]
+        T3[消耗 90%
+38.7 min
+→ 冻结发布]
+        T4[消耗 100%
+43 min
+→ 暂停新特性]
+    end
+
+    B --> T1 --> T2 --> T3 --> T4</div><table>
+<thead>
+<tr>
+<th>消耗比例</th>
+<th>状态</th>
+<th>团队动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&lt; 50%</td>
+<td>🟢 健康</td>
+<td>正常迭代</td>
+</tr>
+<tr>
+<td>50% - 70%</td>
+<td>🟡 关注</td>
+<td>排查近期故障根因</td>
+</tr>
+<tr>
+<td>70% - 90%</td>
+<td>🟠 告警</td>
+<td>组建专项改进小组</td>
+</tr>
+<tr>
+<td>90% - 100%</td>
+<td>🔴 严重</td>
+<td>暂停新功能发布，集中改进</td>
+</tr>
+<tr>
+<td>&gt; 100%</td>
+<td>⚫ 预算耗尽</td>
+<td>SLO 未达标，需调整目标或投入</td>
+</tr>
+</tbody></table>
+<h3>2.2 多层级 SLO</h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>SLO 目标</th>
+<th>错误预算/月</th>
+<th>告警阈值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Tier 0</strong>（核心交易）</td>
+<td>99.99%</td>
+<td>4.3 min</td>
+<td>消耗 30% 告警</td>
+</tr>
+<tr>
+<td><strong>Tier 1</strong>（重要业务）</td>
+<td>99.95%</td>
+<td>21.5 min</td>
+<td>消耗 50% 告警</td>
+</tr>
+<tr>
+<td><strong>Tier 2</strong>（基础服务）</td>
+<td>99.9%</td>
+<td>43 min</td>
+<td>消耗 70% 告警</td>
+</tr>
+<tr>
+<td><strong>Tier 3</strong>（工具/辅助）</td>
+<td>99.5%</td>
+<td>3.6 h</td>
+<td>消耗 80% 告警</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. 效果评估指标体系</h2>
+<h3>3.1 五大评估维度</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>核心指标</th>
+<th>目标</th>
+<th>度量方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>速度</strong></td>
+<td>MTTD / MTTR</td>
+<td>1-5-10</td>
+<td>每次故障记录</td>
+</tr>
+<tr>
+<td><strong>智能</strong></td>
+<td>根因准确率 / 知识覆盖率</td>
+<td>&gt; 80%</td>
+<td>人工复核</td>
+</tr>
+<tr>
+<td><strong>效率</strong></td>
+<td>自动化率 / 告警压缩率</td>
+<td>&gt; 80% / &gt; 70%</td>
+<td>系统统计</td>
+</tr>
+<tr>
+<td><strong>质量</strong></td>
+<td>误报率 / 漏报率</td>
+<td>&lt; 20% / &lt; 5%</td>
+<td>告警确认记录</td>
+</tr>
+<tr>
+<td><strong>进化</strong></td>
+<td>模型迭代周期 / 知识增长率</td>
+<td>&lt; 7d / &gt; 10%/月</td>
+<td>系统统计</td>
+</tr>
+</tbody></table>
+<h3>3.2 告警质量评估</h3>
+<div class="mermaid">flowchart LR
+    subgraph 输入["告警"]
+        A[原始告警
+150+ 条/天]
+    end
+
+    subgraph 处理["智能感知层"]
+        D[去重合并
+-40%]
+        F[关联分析
+-20%]
+        C[分类分级
+-10%]
+    end
+
+    subgraph 输出["有效告警"]
+        O[35 条/天
+有效告警]
+    end
+
+    A --> D --> F --> C --> O</div><p><strong>评估公式：</strong></p>
+<ul>
+<li>告警压缩率 = (原始告警 - 有效告警) / 原始告警 × 100%</li>
+<li>误报率 = 人工判定为误报 / 有效告警 × 100%</li>
+<li>漏报率 = 未检测到的故障 / 实际发生的故障 × 100%</li>
+</ul>
+<hr>
+<h2>4. ROI 计算器</h2>
+<h3>4.1 收益计算</h3>
+<table>
+<thead>
+<tr>
+<th>收益项</th>
+<th>计算方式</th>
+<th>年化收益（示例）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障损失减少</td>
+<td>(原 MTTR - 新 MTTR) × 故障次数 × 故障成本/分钟</td>
+<td>960 万/年</td>
+</tr>
+<tr>
+<td>人力成本节约</td>
+<td>减少的告警处理工时 × 人力成本</td>
+<td>360 万/年</td>
+</tr>
+<tr>
+<td>自动化效率</td>
+<td>自动化节省的工时 × 成本</td>
+<td>200 万/年</td>
+</tr>
+<tr>
+<td><strong>总收益</strong></td>
+<td>—</td>
+<td><strong>1520 万/年</strong></td>
+</tr>
+</tbody></table>
+<h3>4.2 投入计算</h3>
+<table>
+<thead>
+<tr>
+<th>投入项</th>
+<th>一次性</th>
+<th>持续（年）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>平台建设</td>
+<td>200 万</td>
+<td>—</td>
+</tr>
+<tr>
+<td>集成对接</td>
+<td>50 万</td>
+<td>—</td>
+</tr>
+<tr>
+<td>培训</td>
+<td>10 万</td>
+<td>5 万/年</td>
+</tr>
+<tr>
+<td>运维人力</td>
+<td>—</td>
+<td>100 万/年</td>
+</tr>
+<tr>
+<td><strong>总投入</strong></td>
+<td>260 万</td>
+<td>105 万/年</td>
+</tr>
+</tbody></table>
+<h3>4.3 ROI 计算</h3>
+<pre><code>年化 ROI = (年化总收益 - 年持续投入) / 总一次性投入 × 100%
+         = (1520 - 105) / 260 × 100%
+         = 544%
+投资回收期 = 总一次性投入 / (月均收益 - 月均持续投入)
+           = 260 / ((1520/12) - (105/12))
+           ≈ 2.2 个月</code></pre><hr>
+<h2>5. 风险评估矩阵</h2>
+<h3>5.1 风险评估标准</h3>
+<table>
+<thead>
+<tr>
+<th>风险等级</th>
+<th>描述</th>
+<th>发生概率</th>
+<th>影响程度</th>
+<th>处理策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>L1 低</strong></td>
+<td>不影响核心指标</td>
+<td>&lt; 10%</td>
+<td>单节点</td>
+<td>记录，定期优化</td>
+</tr>
+<tr>
+<td><strong>L2 中</strong></td>
+<td>部分业务受损</td>
+<td>10-30%</td>
+<td>多实例</td>
+<td>自动恢复 + 通知</td>
+</tr>
+<tr>
+<td><strong>L3 高</strong></td>
+<td>核心功能受损</td>
+<td>30-50%</td>
+<td>集群级</td>
+<td>自动切换 + 人工介入</td>
+</tr>
+<tr>
+<td><strong>L4 严重</strong></td>
+<td>大规模不可用</td>
+<td>&gt; 50%</td>
+<td>多集群</td>
+<td>立即止损 + 最高优先级</td>
+</tr>
+</tbody></table>
+<h3>5.2 典型场景风险评估</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>风险等级</th>
+<th>概率</th>
+<th>影响</th>
+<th>应对</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单 Pod OOM</td>
+<td>L1</td>
+<td>高</td>
+<td>低</td>
+<td>K8s 自动重启</td>
+</tr>
+<tr>
+<td>单 DB 慢查询</td>
+<td>L2</td>
+<td>中</td>
+<td>中</td>
+<td>熔断限流 + 通知 DBA</td>
+</tr>
+<tr>
+<td>核心服务扩缩容异常</td>
+<td>L3</td>
+<td>低</td>
+<td>高</td>
+<td>预案执行 + 审批</td>
+</tr>
+<tr>
+<td>多 AZ 网络故障</td>
+<td>L4</td>
+<td>极低</td>
+<td>极高</td>
+<td>自动切流 + 故障升级</td>
+</tr>
+<tr>
+<td>配置中心宕机</td>
+<td>L3</td>
+<td>低</td>
+<td>高</td>
+<td>本地缓存 + 人工恢复</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. 落地优先级矩阵</h2>
+<h3>6.1 优先级判定</h3>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>业务价值</th>
+<th>实施难度</th>
+<th>典型模块</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0</strong></td>
+<td>高</td>
+<td>低</td>
+<td>数据融合（已有基础设施）</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>高</td>
+<td>中</td>
+<td>智能感知、拓扑建模</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>中</td>
+<td>中</td>
+<td>根因分析、影响分析</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>中</td>
+<td>高</td>
+<td>认知网络、知识进化</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>低</td>
+<td>高</td>
+<td>自动执行（需完善审批机制）</td>
+</tr>
+</tbody></table>
+<h3>6.2 分阶段落地路径</h3>
+<pre><code>第 1 月（P0）：数据采集标准化 → 统一 Dashboard
+第 2-3 月（P1）：异常检测上线 → 告警降噪
+第 4-6 月（P2）：根因分析 → 影响分析
+第 7-9 月（P3）：知识图谱构建 → 认知网络
+第 10-12 月（P4）：自动执行 → 知识进化闭环</code></pre><hr>
+<h2>7. 持续评估机制</h2>
+<h3>7.1 评估节奏</h3>
+<table>
+<thead>
+<tr>
+<th>周期</th>
+<th>评估内容</th>
+<th>负责人</th>
+<th>输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>每日</strong></td>
+<td>核心 SLI 自动检查</td>
+<td>系统</td>
+<td>日报</td>
+</tr>
+<tr>
+<td><strong>每周</strong></td>
+<td>告警质量 + 误报漏报分析</td>
+<td>SRE 团队</td>
+<td>周报</td>
+</tr>
+<tr>
+<td><strong>每月</strong></td>
+<td>错误预算消耗 + ROl 跟踪</td>
+<td>技术负责人</td>
+<td>月报</td>
+</tr>
+<tr>
+<td><strong>每季</strong></td>
+<td>根因准确率回测 + 模型退化检测</td>
+<td>算法团队</td>
+<td>季度报告</td>
+</tr>
+<tr>
+<td><strong>每年</strong></td>
+<td>整体 ROl 复盘 + 下一年规划</td>
+<td>管理层</td>
+<td>年度报告</td>
+</tr>
+</tbody></table>
+<h3>7.2 效果看板设计</h3>
+<pre><code>┌─────────────────────────────────────────────┐
+│  SRE Dashboard                                │
+├──────────┬──────────┬──────────┬──────────────┤
+│ MTTD     │ MTTR     │ 告警压缩率 │ 自动化率     │
+│ 45s 🟢   │ 3.2min 🟢│ 72% 🟢   │ 65% 🟡      │
+│ 目标 &lt;1min│ 目标 &lt;5min│ 目标 &gt;70%│ 目标 &gt;80%    │
+├──────────┴──────────┴──────────┴──────────────┤
+│ 错误预算消耗：Tier0 12% 🟢 / Tier1 38% 🟡    │
+│ 根因准确率 Hit Rate@3：76% 🟡（下降趋势）     │
+│ ROI 跟踪：累计收益 380 万，投入 150 万        │
+└─────────────────────────────────────────────┘</code></pre><hr>
+<h2>8. 落地检查清单</h2>
+<h3>8.1 Phase 1 — 数据采集（对应模块：数据融合）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> 指标数据接入（Prometheus / OpenTelemetry）</li>
+<li><input disabled="" type="checkbox"> 日志数据接入（ELK / Loki）</li>
+<li><input disabled="" type="checkbox"> 调用链数据接入（Jaeger / Tempo）</li>
+<li><input disabled="" type="checkbox"> 事件数据接入（变更事件 + 告警事件）</li>
+<li><input disabled="" type="checkbox"> 数据标准化（统一 schema）</li>
+<li><input disabled="" type="checkbox"> 数据质量监控（完整率 &gt; 99%）</li>
+</ul>
+<h3>8.2 Phase 2 — 感知层（对应模块：智能感知）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> 异常检测算法部署（统计 / ML）</li>
+<li><input disabled="" type="checkbox"> 告警规则配置</li>
+<li><input disabled="" type="checkbox"> 告警去重合并逻辑</li>
+<li><input disabled="" type="checkbox"> 告警分类分级</li>
+<li><input disabled="" type="checkbox"> 告警路由配置</li>
+<li><input disabled="" type="checkbox"> 感知延迟 &lt; 1s</li>
+</ul>
+<h3>8.3 Phase 3 — 认知层（对应模块：认知网络）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> CMDB 接入（拓扑数据）</li>
+<li><input disabled="" type="checkbox"> 知识图谱构建（实体 + 关系）</li>
+<li><input disabled="" type="checkbox"> 图数据库部署（Neo4j）</li>
+<li><input disabled="" type="checkbox"> 向量索引配置（RAG）</li>
+<li><input disabled="" type="checkbox"> 推理引擎验证</li>
+<li><input disabled="" type="checkbox"> 知识覆盖率 &gt; 80%</li>
+</ul>
+<h3>8.4 Phase 4 — 分析层（对应模块：根因分析 + 影响分析）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> 拓扑关系导入</li>
+<li><input disabled="" type="checkbox"> PageRank / 最短路径算法部署</li>
+<li><input disabled="" type="checkbox"> 因果推断算法（如需要）</li>
+<li><input disabled="" type="checkbox"> 根因准确率验证（Hit Rate@3 &gt; 80%）</li>
+<li><input disabled="" type="checkbox"> 影响范围计算</li>
+<li><input disabled="" type="checkbox"> MRR &gt; 0.7</li>
+</ul>
+<h3>8.5 Phase 5 — 决策与执行（对应模块：智能决策 + 自动执行）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> 决策引擎配置</li>
+<li><input disabled="" type="checkbox"> 执行剧本编写</li>
+<li><input disabled="" type="checkbox"> 审批工作流配置</li>
+<li><input disabled="" type="checkbox"> 灰度执行配置</li>
+<li><input disabled="" type="checkbox"> 自动回滚验证</li>
+<li><input disabled="" type="checkbox"> 自动化率 &gt; 80%</li>
+</ul>
+<h3>8.6 Phase 6 — 知识进化（对应模块：知识进化）</h3>
+<ul>
+<li><input disabled="" type="checkbox"> 故障案例自动沉淀</li>
+<li><input disabled="" type="checkbox"> 知识图谱更新机制</li>
+<li><input disabled="" type="checkbox"> ML 模型迭代机制</li>
+<li><input disabled="" type="checkbox"> 知识质量审核</li>
+<li><input disabled="" type="checkbox"> 进化周期 &lt; 24h</li>
+</ul>
+<hr>
+<h2>9. 效果验证方法</h2>
+<h3>9.1 验证实验设计</h3>
+<table>
+<thead>
+<tr>
+<th>实验类型</th>
+<th>方法</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A/B 测试</strong></td>
+<td>新旧系统对比</td>
+<td>告警准确率、MTTR</td>
+</tr>
+<tr>
+<td><strong>Chaos 测试</strong></td>
+<td>注入故障验证检测</td>
+<td>根因定位准确性</td>
+</tr>
+<tr>
+<td><strong>回滚测试</strong></td>
+<td>执行后回滚验证</td>
+<td>自动执行安全性</td>
+</tr>
+<tr>
+<td><strong>长稳测试</strong></td>
+<td>长期运行观测</td>
+<td>系统稳定性</td>
+</tr>
+<tr>
+<td><strong>压力测试</strong></td>
+<td>模拟极端流量</td>
+<td>容量规划验证</td>
+</tr>
+</tbody></table>
+<h3>9.2 关键阈值告警</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>阈值</th>
+<th>动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MTTD</td>
+<td>&gt; 3 分钟</td>
+<td>告警：检测延迟</td>
+</tr>
+<tr>
+<td>MTTR</td>
+<td>&gt; 10 分钟</td>
+<td>告警：恢复超时</td>
+</tr>
+<tr>
+<td>根因准确率</td>
+<td>&lt; 70%</td>
+<td>告警：模型退化</td>
+</tr>
+<tr>
+<td>自动化成功率</td>
+<td>&lt; 90%</td>
+<td>告警：执行异常</td>
+</tr>
+<tr>
+<td>错误预算消耗</td>
+<td>&gt; 70%</td>
+<td>告警：预算紧张</td>
+</tr>
+</tbody></table>
+
+      </article>
+    </main>
+  </div>
+
+  <script>
+    // Accordion sidebar: only one section open at a time
+    document.querySelectorAll('.sidebar-section-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const items = header.nextElementSibling;
+        const isOpen = items.classList.contains('open');
+        // Close all sections first
+        document.querySelectorAll('.sidebar-section-items').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.sidebar-section-header').forEach(el => el.classList.remove('open'));
+        // Open clicked section only if it was closed
+        if (!isOpen) {
+          items.classList.add('open');
+          header.classList.add('open');
+        }
+      });
+    });
+
+    // Open current page's section; highlight active link
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+      if (link.getAttribute('href') === currentPath) {
+        link.classList.add('active');
+        const section = link.closest('.sidebar-section-items');
+        const header = section ? section.previousElementSibling : null;
+        if (section) section.classList.add('open');
+        if (header) header.classList.add('open');
+      }
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+          const text = link.textContent.toLowerCase();
+          const li = link.closest('li');
+          li.style.display = (query === '' || text.includes(query)) ? '' : 'none';
+        });
+        document.querySelectorAll('.sidebar-section-items').forEach(section => {
+          const hasVisible = section.querySelectorAll('li:not([style*="display: none"])').length > 0;
+          const header = section.previousElementSibling;
+          if (hasVisible || query === '') {
+            section.classList.add('open');
+            header.classList.add('open');
+          }
+        });
+      });
+    }
+
+    // Mobile toggle
+    document.querySelector('.sidebar-toggle')?.addEventListener('click', () => {
+      document.querySelector('.sidebar').classList.toggle('open');
+    });
+
+    // Mermaid: Load dynamically
+    (function() {
+      const mermaidDivs = document.querySelectorAll('.mermaid');
+      if (mermaidDivs.length === 0) return;
+
+      const cdns = [
+        '/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js',
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js'
+      ];
+      let cdnIndex = 0;
+
+      function showError(msg) {
+        mermaidDivs.forEach(div => {
+          div.innerHTML = '<div class="mermaid-error" style="padding:16px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:20px 0;">' + msg + '</div>';
+          div.classList.add('rendered');
+        });
+      }
+
+      function tryLoadMermaid() {
+        if (cdnIndex >= cdns.length) {
+          showError('❌ 无法加载图表库，请检查网络连接后刷新页面');
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = cdns[cdnIndex];
+        script.onload = function() {
+          if (typeof mermaid === 'undefined') {
+            showError('❌ 图表库加载失败');
+            return;
+          }
+          try {
+            mermaid.run({
+              querySelector: '.mermaid',
+              startOnLoad: false,
+              theme: 'base',
+              themeVariables: {
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+                primaryColor: '#4f46e5',
+                primaryTextColor: '#1e293b',
+                primaryBorderColor: '#4f46e5',
+                lineColor: '#64748b',
+                secondaryColor: '#f1f5f9',
+                tertiaryColor: '#f8fafc',
+              },
+              securityLevel: 'loose',
+              flowchart: { curve: 'basis', padding: 15, nodeSpacing: 50, rankSpacing: 80 },
+              maxTextSize: 50000,
+            });
+            mermaidDivs.forEach(div => div.classList.add('rendered'));
+          } catch(e) {
+            showError('❌ 图表渲染失败: ' + e.message);
+          }
+        };
+        script.onerror = function() { cdnIndex++; tryLoadMermaid(); };
+        document.head.appendChild(script);
+      }
+      tryLoadMermaid();
+    })();
+  </script>
+</body>
+</html>

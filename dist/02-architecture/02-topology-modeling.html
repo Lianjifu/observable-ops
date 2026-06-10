@@ -1,0 +1,2051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模块 02 · 拓扑建模</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 62.5%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 15px;
+      color: #1e293b;
+      line-height: 1.7;
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== Section Color Themes ===== */
+    .sidebar-section[data-section="1"] { --section-clr: #4f46e5; --section-bg: rgba(79,70,229,0.08); --section-bg-hover: rgba(79,70,229,0.12); --section-light: #eef2ff; }
+    .sidebar-section[data-section="2"] { --section-clr: #0d9488; --section-bg: rgba(13,148,136,0.08); --section-bg-hover: rgba(13,148,136,0.12); --section-light: #f0fdfa; }
+    .sidebar-section[data-section="3"] { --section-clr: #d97706; --section-bg: rgba(217,119,6,0.08); --section-bg-hover: rgba(217,119,6,0.12); --section-light: #fffbeb; }
+
+    /* ===== Layout ===== */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ===== Sidebar ===== */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #f8fafc;
+      border-right: 1px solid #e2e8f0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
+      padding: 20px 20px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand .icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* --- Search --- */
+    .sidebar-search {
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box:focus-within {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: #1e293b;
+      background: transparent;
+    }
+    .search-box input::placeholder { color: #94a3b8; }
+    .search-box svg { width: 15px; height: 15px; color: #94a3b8; flex-shrink: 0; }
+
+    /* --- Quick Links --- */
+    /* --- Scrollable Nav Area --- */
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 12px;
+    }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    .sidebar-nav ul, .sidebar-nav li { list-style: none; }
+
+    /* --- Section Header (collapsible toggle) --- */
+    .sidebar-section { margin-bottom: 2px; }
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .sidebar-section-header:hover { background: rgba(0,0,0,0.04); }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .section-num {
+      width: 22px; height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--section-clr, #4f46e5);
+      flex-shrink: 0;
+    }
+    .section-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-section-header .arrow {
+      width: 16px; height: 16px;
+      color: #94a3b8;
+      flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+    .sidebar-section-header.open .arrow {
+      transform: rotate(90deg);
+      color: var(--section-clr, #4f46e5);
+    }
+
+    /* --- Section Items (collapsible content) --- */
+    .sidebar-section-items {
+      display: none;
+    }
+    .sidebar-section-items.open {
+      display: block;
+    }
+    .sidebar-section-items > ul {
+      padding: 0 8px 0;
+    }
+    .sidebar-section-items li { margin: 1px 0; }
+    .sidebar-section-items a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: #64748b;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      margin-left: 2px;
+    }
+    .sidebar-section-items a:hover {
+      color: #1e293b;
+      background: rgba(0,0,0,0.03);
+      border-left-color: #cbd5e1;
+    }
+    .sidebar-section-items a.active {
+      color: var(--section-clr, #4f46e5);
+      background: var(--section-bg, rgba(79,70,229,0.08));
+      border-left-color: var(--section-clr, #4f46e5);
+      font-weight: 500;
+    }
+    .sidebar-section-items a .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .sidebar-section-items a:hover .dot { background: #94a3b8; }
+    .sidebar-section-items a.active .dot { background: var(--section-clr, #4f46e5); }
+
+    /* --- External Links --- */
+    .sidebar-footer {
+      padding: 8px 14px 14px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      flex-shrink: 0;
+    }
+    .sidebar-footer a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .sidebar-footer a:hover { border-color: #4f46e5; color: #4f46e5; background: #eef2ff; }
+    .sidebar-footer a svg { width: 15px; height: 15px; opacity: 0.5; }
+
+    /* ===== Content ===== */
+    .content {
+      flex: 1;
+      margin-left: 280px;
+      padding: 48px 64px;
+      min-height: 100vh;
+      max-width: 1400px;
+    }
+
+    /* ===== Typography ===== */
+    .markdown-section h1 {
+      font-size: 28px; font-weight: 700; color: #0f172a;
+      letter-spacing: -0.02em; margin: 0 0 24px;
+      padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;
+    }
+    .markdown-section h2 { font-size: 20px; font-weight: 600; color: #1e293b; letter-spacing: -0.01em; margin: 40px 0 16px; }
+    .markdown-section h3 { font-size: 16px; font-weight: 600; color: #4f46e5; margin: 28px 0 12px; }
+    .markdown-section h4 { font-size: 15px; font-weight: 600; color: #1e293b; margin: 20px 0 8px; }
+    .markdown-section p { margin: 12px 0; color: #475569; }
+    .markdown-section a { color: #4f46e5; text-decoration: none; font-weight: 500; }
+    .markdown-section a:hover { text-decoration: underline; }
+    .markdown-section code {
+      background: #f1f5f9; color: #0f172a;
+      padding: 2px 6px; font-size: 13px;
+      border-radius: 4px; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
+    }
+    .markdown-section pre { background: #1e293b; border-radius: 12px; padding: 20px 24px; overflow-x: auto; margin: 20px 0; }
+    .markdown-section pre code { background: transparent; color: #e2e8f0; padding: 0; font-size: 13px; line-height: 1.6; }
+    .markdown-section blockquote {
+      background: #f8fafc; border-left: 4px solid #4f46e5;
+      border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0;
+    }
+    .markdown-section blockquote p { margin: 0; color: #475569; }
+    .markdown-section table {
+      width: 100%; border-collapse: collapse; margin: 20px 0;
+      font-size: 14px; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .markdown-section table th { background: #f8fafc; font-weight: 600; text-align: left; padding: 12px 16px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .markdown-section table td { padding: 12px 16px; border-top: 1px solid #e2e8f0; }
+    .markdown-section table tr:nth-child(2n) td { background: #f8fafc; }
+    .markdown-section ul, .markdown-section ol { padding-left: 24px; margin: 12px 0; }
+    .markdown-section li { margin: 6px 0; color: #475569; }
+    .markdown-section hr { height: 1px; background: #e2e8f0; border: none; margin: 32px 0; }
+    .markdown-section img { max-width: 100%; height: auto; border-radius: 8px; }
+
+    /* ===== Section Callout ===== */
+    .markdown-section .section-callout {
+      background: linear-gradient(135deg, rgba(79,70,229,0.04) 0%, rgba(124,58,237,0.04) 100%);
+      border-left: 4px solid #4f46e5; border-radius: 0 12px 12px 0;
+      padding: 18px 24px 22px; margin: 8px 0 28px;
+    }
+    .markdown-section .section-callout blockquote {
+      background: rgba(79,70,229,0.07); border: none; border-radius: 8px;
+      padding: 10px 14px; margin: 0 0 16px; font-size: 14px; color: #1e293b;
+    }
+    .markdown-section .section-callout blockquote p { margin: 0; color: #1e293b; }
+    .markdown-section .section-callout h4 { color: #4f46e5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 18px 0 10px; }
+    .markdown-section .section-callout h4:first-of-type { margin-top: 0; }
+    .markdown-section .section-callout ol { list-style: none; counter-reset: callout-item; padding: 0; margin: 0 0 12px; }
+    .markdown-section .section-callout ol li {
+      counter-increment: callout-item; padding: 8px 0 8px 40px;
+      position: relative; color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0;
+    }
+    .markdown-section .section-callout ol li::before {
+      content: counter(callout-item);
+      position: absolute; left: 0; top: 7px;
+      width: 26px; height: 26px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff; border-radius: 50%; text-align: center;
+      line-height: 26px; font-size: 12px; font-weight: 700;
+    }
+    .markdown-section .section-callout table { margin: 8px 0 4px; font-size: 13px; }
+    .markdown-section .section-callout table th { background: rgba(79,70,229,0.08); color: #4f46e5; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .markdown-section .section-callout table th,
+    .markdown-section .section-callout table td { padding: 8px 12px; }
+
+    /* ===== Mermaid ===== */
+    .mermaid { background: #f8fafc; border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; border: 1px solid #e2e8f0; display: block; }
+    .mermaid.rendered { display: block; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    .mermaid-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; color: #dc2626; margin: 20px 0; }
+    .mermaid-loading { background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 12px; padding: 24px; margin: 20px 0; color: #64748b; text-align: center; }
+
+    /* ===== Navigation ===== */
+    .nav { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+    .nav a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 18px; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; color: #475569; text-decoration: none;
+      font-size: 14px; font-weight: 500; transition: all 0.15s;
+    }
+    .nav a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    /* ===== Mobile ===== */
+    .sidebar-toggle {
+      display: none; position: fixed; top: 12px; left: 12px; z-index: 100;
+      background: white; border: 1px solid #e2e8f0; color: #1e293b;
+      width: 38px; height: 38px; border-radius: 8px; cursor: pointer;
+      font-size: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      align-items: center; justify-content: center;
+    }
+    @media (max-width: 1024px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-toggle { display: flex; }
+      .content { margin-left: 0; padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <button class="sidebar-toggle">☰</button>
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <a href="/index.html" class="sidebar-brand">
+          <span class="icon">📚</span>
+          智能系统运维可观测性
+        </a>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="搜索文档..." id="searchInput">
+        </div>
+      </div>
+
+      <div class="sidebar-nav">
+        <div class="sidebar-section" data-section="1">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">1</span>
+            <span class="section-name">业务流程</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/01-intro/01-product-overview.html"><span class="dot"></span>业务 01 · 产品概述</a></li><li><a href="/01-intro/02-topology-modeling.html"><span class="dot"></span>业务 02 · 拓扑建模</a></li><li><a href="/01-intro/03-data-fusion.html"><span class="dot"></span>业务 03 · 数据融合</a></li><li><a href="/01-intro/04-intelligent-sensing.html"><span class="dot"></span>业务 04 · 智能感知</a></li><li><a href="/01-intro/05-cognitive-network.html"><span class="dot"></span>业务 05 · 认知网络</a></li><li><a href="/01-intro/06-fault-analysis.html"><span class="dot"></span>业务 06 · 故障分析</a></li><li><a href="/01-intro/07-root-cause.html"><span class="dot"></span>业务 07 · 根因定位</a></li><li><a href="/01-intro/08-impact-analysis.html"><span class="dot"></span>业务 08 · 影响分析</a></li><li><a href="/01-intro/09-intelligent-decision.html"><span class="dot"></span>业务 09 · 智能决策</a></li><li><a href="/01-intro/10-auto-execution.html"><span class="dot"></span>业务 10 · 自动执行</a></li><li><a href="/01-intro/11-knowledge-evolution.html"><span class="dot"></span>业务 11 · 知识演进</a></li></ul></div></div><div class="sidebar-section" data-section="2">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">2</span>
+            <span class="section-name">功能逻辑</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/02-architecture/01-module-architecture.html"><span class="dot"></span>模块 01 · 总体架构</a></li><li><a href="/02-architecture/02-topology-modeling.html"><span class="dot"></span>模块 02 · 拓扑建模</a></li><li><a href="/02-architecture/03-data-fusion.html"><span class="dot"></span>模块 03 · 数据融合</a></li><li><a href="/02-architecture/04-intelligent-sensing.html"><span class="dot"></span>模块 04 · 智能感知</a></li><li><a href="/02-architecture/05-cognitive-network.html"><span class="dot"></span>模块 05 · 认知网络</a></li><li><a href="/02-architecture/06-fault-diagnosis.html"><span class="dot"></span>模块 06 · 故障研判</a></li><li><a href="/02-architecture/07-root-cause.html"><span class="dot"></span>模块 07 · 根因分析</a></li><li><a href="/02-architecture/08-impact-analysis.html"><span class="dot"></span>模块 08 · 影响分析</a></li><li><a href="/02-architecture/09-intelligent-decision.html"><span class="dot"></span>模块 09 · 智能决策</a></li><li><a href="/02-architecture/10-auto-execution.html"><span class="dot"></span>模块 10 · 自动执行</a></li><li><a href="/02-architecture/11-knowledge-evolution.html"><span class="dot"></span>模块 11 · 知识进化</a></li></ul></div></div><div class="sidebar-section" data-section="3">
+        <div class="sidebar-section-header">
+          <span class="section-title">
+            <span class="section-num">3</span>
+            <span class="section-name">参考资料</span>
+          </span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="sidebar-section-items"><ul><li><a href="/03-reference/01-foundation.html"><span class="dot"></span>参考 01 · AIOps 基础与标准</a></li><li><a href="/03-reference/02-root-cause-reasoning.html"><span class="dot"></span>参考 02 · 根因推理算法</a></li><li><a href="/03-reference/03-knowledge-graph.html"><span class="dot"></span>参考 03 · 知识图谱技术</a></li><li><a href="/03-reference/04-sre-agents.html"><span class="dot"></span>参考 04 ·  SRE Agent 架构</a></li><li><a href="/03-reference/05-evaluation-framework.html"><span class="dot"></span>参考 05 · 评估框架与落地</a></li></ul></div></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="https://github.com" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </nav>
+
+    <main class="content">
+      <article class="markdown-section">
+        <h1>模块 02 · 拓扑建模</h1>
+<blockquote>
+<p>智能系统运维可观测性 · 拓扑建模模块功能逻辑设计</p>
+</blockquote>
+<hr>
+<h2>1. 功能概述</h2>
+<blockquote>
+<p>拓扑建模模块是 Observable Ops 平台的「数字底盘」——将物理世界的基础设施和逻辑世界的依赖关系抽象为统一知识图谱，为所有上层智能分析模块提供拓扑数据服务。</p>
+</blockquote>
+<h3>1.1 模块定位</h3>
+<div class="mermaid">flowchart LR
+    subgraph 采集["数据采集层"]
+        C1[K8s API]
+        C2[CMDB]
+        C3[Service Mesh]
+        C4[Prometheus]
+    end
+    subgraph 本模块["02 拓扑建模"]
+        T1[拓扑构建]
+        T2[拓扑存储]
+        T3[拓扑查询]
+        T4[拓扑分析]
+    end
+    subgraph 上层["上层消费模块"]
+        U1[04 智能感知]
+        U2[05 认知网络]
+        U3[06 故障研判]
+        U4[07 根因分析]
+        U5[08 影响分析]
+    end
+    采集 --> 本模块 --> 上层
+    style 采集 fill:#e3f2fd
+    style 本模块 fill:#d1e7dd
+    style 上层 fill:#fff9c4</div><table>
+<thead>
+<tr>
+<th>定位维度</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>平台定位</strong></td>
+<td>数据基础设施模块，为所有上层智能分析模块提供拓扑数据服务</td>
+</tr>
+<tr>
+<td><strong>能力定位</strong></td>
+<td>拓扑数据的构建、存储、查询和分析能力</td>
+</tr>
+<tr>
+<td><strong>数据定位</strong></td>
+<td>实体（节点）+ 关系（边）+ 属性统一模型</td>
+</tr>
+<tr>
+<td><strong>技术定位</strong></td>
+<td>图数据库（Neo4j）+ 时序数据库（TimescaleDB）+ 消息队列（Kafka）</td>
+</tr>
+</tbody></table>
+<h3>1.2 职责边界</h3>
+<div class="mermaid">flowchart TB
+    subgraph 做["职责范围：做"]
+        D1[多源拓扑数据汇聚与融合]
+        D2[实体与关系统一建模]
+        D3[图谱实时更新与增量同步]
+        D4[拓扑查询 API]
+        D5[拓扑分析算法]
+        D6[拓扑变更事件发布]
+    end
+    subgraph 不做["明确不做"]
+        N1[不做监控指标采集]
+        N2[不做异常检测判断]
+        N3[不做根因推理]
+        N4[不做业务告警通知]
+    end
+    做 --> 不做
+    style 做 fill:#d1e7dd
+    style 不做 fill:#fce7f3</div><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>具体职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>做</strong></td>
+<td>多源拓扑数据汇聚融合（K8s、CMDB、Prometheus、Service Mesh）· 实体与关系统一建模 · 图谱实时更新与增量同步 · 拓扑查询 API（路径、邻居、子图、聚合）· 拓扑分析算法（连通分量、中心性、PageRank、社区发现）· 拓扑变更事件发布</td>
+</tr>
+<tr>
+<td><strong>不做</strong></td>
+<td>原始指标采集（采集层负责）· 异常检测逻辑（智能感知负责）· 根因推理（根因分析负责）· 业务告警通知（应用层负责）</td>
+</tr>
+</tbody></table>
+<h3>1.3 模块协作关系</h3>
+<div class="mermaid">flowchart LR
+    M02[02 拓扑建模] --> M03[03 数据融合]
+    M02 --> M04[04 智能感知]
+    M02 --> M05[05 认知网络]
+    M02 --> M06[06 故障研判]
+    M02 --> M07[07 根因分析]
+    M02 --> M08[08 影响分析]
+    M03 -.->|数据融合| M02
+    M04 -.->|拓扑查询| M02
+    M05 -.->|知识检索| M02
+    M06 -.->|拓扑上下文| M02
+    M07 -.->|故障路径| M02
+    M08 -.->|影响范围| M02
+    style M02 fill:#d1e7dd
+    style M03 fill:#e3f2fd
+    style M04 fill:#fff9c4
+    style M05 fill:#fff9c4
+    style M06 fill:#ffccbc
+    style M07 fill:#ffccbc
+    style M08 fill:#ffccbc</div><table>
+<thead>
+<tr>
+<th>上游模块</th>
+<th>数据流向</th>
+<th>接口方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>03 数据融合</td>
+<td>汇聚后的标准化实体/关系数据</td>
+<td>Kafka Topic 推送</td>
+</tr>
+<tr>
+<td>04 智能感知</td>
+<td>查询拓扑上下文用于异常检测</td>
+<td>gRPC 查询</td>
+</tr>
+<tr>
+<td>05 认知网络</td>
+<td>构建知识图谱的拓扑层</td>
+<td>gRPC 订阅</td>
+</tr>
+<tr>
+<td>06 故障研判</td>
+<td>获取故障相关的拓扑信息</td>
+<td>gRPC 查询</td>
+</tr>
+<tr>
+<td>07 根因分析</td>
+<td>故障传播路径分析</td>
+<td>gRPC 查询</td>
+</tr>
+<tr>
+<td>08 影响分析</td>
+<td>影响范围评估</td>
+<td>gRPC 查询</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. 功能架构</h2>
+<h3>2.1 数据模型架构</h3>
+<div class="mermaid">flowchart TB
+    subgraph 实体层["实体层级模型"]
+        L1[基础设施层]
+        L2[逻辑服务层]
+        L3[应用实例层]
+        L4[运行时层]
+    end
+    subgraph 基础设施层
+        I1[主机 Host]
+        I2[网络设备 Network]
+        I3[存储设备 Storage]
+    end
+    subgraph 逻辑服务层
+        L21[服务 Service]
+        L22[命名空间 Namespace]
+        L23[集群 Cluster]
+        L24[网关 Gateway]
+    end
+    subgraph 应用实例层
+        L31[容器 Container]
+        L32[进程 Process]
+        L33[端点 Endpoint]
+        L34[域名 Domain]
+    end
+    subgraph 运行时层
+        R1[指标 Metric]
+        R2[追踪 Trace]
+        R3[日志 Log]
+        R4[事件 Event]
+    end
+    L1 --> L2 --> L3 --> L4
+    style L1 fill:#e3f2fd
+    style L2 fill:#d1e7dd
+    style L3 fill:#fff9c4
+    style L4 fill:#ffccbc</div><h4>实体模型</h4>
+<table>
+<thead>
+<tr>
+<th>实体类型</th>
+<th>英文名</th>
+<th>关键属性</th>
+<th>数据来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>主机</strong></td>
+<td>Host</td>
+<td>hostname, ip, os, cpu_count, mem_gb, cloud_region</td>
+<td>CMDB / 云平台 API</td>
+</tr>
+<tr>
+<td><strong>网络设备</strong></td>
+<td>NetworkDevice</td>
+<td>device_type, vendor, model</td>
+<td>CMDB / SNMP</td>
+</tr>
+<tr>
+<td><strong>服务</strong></td>
+<td>Service</td>
+<td>service_name, namespace, protocol, port</td>
+<td>K8s API / 服务发现</td>
+</tr>
+<tr>
+<td><strong>集群</strong></td>
+<td>Cluster</td>
+<td>cluster_id, cluster_name, version, cloud_provider</td>
+<td>K8s API</td>
+</tr>
+<tr>
+<td><strong>命名空间</strong></td>
+<td>Namespace</td>
+<td>ns_name, cluster, labels</td>
+<td>K8s API</td>
+</tr>
+<tr>
+<td><strong>容器</strong></td>
+<td>Container</td>
+<td>container_id, image, pod_name, node_name, status</td>
+<td>K8s API / cAdvisor</td>
+</tr>
+<tr>
+<td><strong>网关</strong></td>
+<td>Gateway</td>
+<td>gateway_name, upstream_services, rate_limit</td>
+<td>Service Mesh</td>
+</tr>
+<tr>
+<td><strong>端点</strong></td>
+<td>Endpoint</td>
+<td>path, method, status_code, latency_p99</td>
+<td>APM / 日志解析</td>
+</tr>
+</tbody></table>
+<h4>关系模型</h4>
+<table>
+<thead>
+<tr>
+<th>关系</th>
+<th>英文名</th>
+<th>起点</th>
+<th>终点</th>
+<th>属性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>包含</strong></td>
+<td>contains</td>
+<td>Cluster / Namespace / Service</td>
+<td>Namespace / Service / Container</td>
+<td>labels, since</td>
+</tr>
+<tr>
+<td><strong>部署在</strong></td>
+<td>runs_on</td>
+<td>Container / Pod</td>
+<td>Host / Node</td>
+<td>node_name, zone</td>
+</tr>
+<tr>
+<td><strong>调用</strong></td>
+<td>calls</td>
+<td>Service / Container</td>
+<td>Service / Endpoint</td>
+<td>protocol, port, qps, latency_avg</td>
+</tr>
+<tr>
+<td><strong>访问</strong></td>
+<td>accesses</td>
+<td>Gateway / Ingress</td>
+<td>Service</td>
+<td>path, method, rate_limit</td>
+</tr>
+<tr>
+<td><strong>监控</strong></td>
+<td>monitors</td>
+<td>Prometheus / Telegraf</td>
+<td>Host / Service / Container</td>
+<td>scrape_interval, metrics</td>
+</tr>
+<tr>
+<td><strong>同步</strong></td>
+<td>syncs</td>
+<td>CMDB</td>
+<td>Host / NetworkDevice</td>
+<td>last_sync, source</td>
+</tr>
+</tbody></table>
+<h4>属性模型</h4>
+<table>
+<thead>
+<tr>
+<th>属性类型</th>
+<th>说明</th>
+<th>存储方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>静态属性</strong></td>
+<td>不经常变化（hostname, os, region）</td>
+<td>Neo4j 节点属性</td>
+</tr>
+<tr>
+<td><strong>动态属性</strong></td>
+<td>实时变化（status, cpu_usage, qps）</td>
+<td>TimescaleDB 时序数据</td>
+</tr>
+<tr>
+<td><strong>关系属性</strong></td>
+<td>边的属性（调用 qps, 延迟）</td>
+<td>Neo4j 边属性</td>
+</tr>
+<tr>
+<td><strong>元数据属性</strong></td>
+<td>标签、注解、描述</td>
+<td>Neo4j 节点属性（JSON）</td>
+</tr>
+</tbody></table>
+<h3>2.2 分层架构</h3>
+<div class="mermaid">flowchart TB
+    subgraph 元数据层["元数据层 Meta Graph"]
+        G1[Schema 定义
+实体类型 + 关系类型]
+    end
+    subgraph 实例层["实例层 Instance Graph"]
+        G2[具体实体
+具体关系实例]
+    end
+    subgraph 聚合层["聚合层 Aggregate Graph"]
+        G3[服务拓扑视图
+集群拓扑视图]
+    end
+    subgraph 时序层["时序层 Temporal Graph"]
+        G4[历史快照
+变更轨迹]
+    end
+    G1 --> G2 --> G3 --> G4
+    style G1 fill:#e3f2fd
+    style G2 fill:#d1e7dd
+    style G3 fill:#fff9c4
+    style G4 fill:#ffccbc</div><table>
+<thead>
+<tr>
+<th>层次</th>
+<th>描述</th>
+<th>查询场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>元数据层</strong></td>
+<td>Schema 级别的实体类型和关系类型定义</td>
+<td>类型查询、Schema 验证</td>
+</tr>
+<tr>
+<td><strong>实例层</strong></td>
+<td>具体实体和关系实例</td>
+<td>节点查询、路径查询、邻居查询</td>
+</tr>
+<tr>
+<td><strong>聚合层</strong></td>
+<td>按服务/集群聚合的视图</td>
+<td>服务拓扑、集群拓扑、聚合指标</td>
+</tr>
+<tr>
+<td><strong>时序层</strong></td>
+<td>拓扑变更的历史快照</td>
+<td>变更轨迹、回滚分析、故障复盘</td>
+</tr>
+</tbody></table>
+<h3>2.3 协作模式</h3>
+<div class="mermaid">sequenceDiagram
+    participant CMDB as 数据源
+CMDB / K8s
+    participant TM as 02 拓扑建模
+    participant NB as Neo4j
+    participant RD as Redis
+    participant 04 as 04 智能感知
+    participant 06 as 06 故障研判
+
+    Note over TM: 启动时全量同步
+    CMDB->>TM: 批量导出
+    TM->>TM: 解析 + 实体映射
+    TM->>NB: 批量写入
+    NB-->>TM: 写入完成
+    TM->>RD: 缓存预热
+
+    Note over TM: 运行期增量更新
+    loop 实时监听
+        CMDB->>TM: K8s Watch / API 变更
+        TM->>TM: 增量解析
+        TM->>NB: 事务更新
+        TM->>RD: 缓存失效
+        TM->>04: Kafka拓扑变更事件
+    end
+
+    Note over TM: 查询请求
+    04->>TM: gRPC: GetNeighbors
+    TM->>RD: 缓存查询
+    RD-->>TM: 缓存命中
+    TM-->>04: 邻居节点列表
+    06->>TM: gRPC: FindPath
+    TM->>NB: Cypher 路径查询
+    NB-->>TM: 路径结果
+    TM-->>06: 故障传播路径</div><hr>
+<h2>3. 核心功能</h2>
+<h3>3.1 拓扑构建</h3>
+<div class="mermaid">flowchart LR
+    C1[多源数据] --> P1[数据解析]
+    P1 --> P2[实体映射]
+    P2 --> P3[关系抽取]
+    P3 --> P4[冲突解决]
+    P4 --> P5[图谱写入]
+    P5 --> E1[Neo4j]
+    P5 --> E2[Kafka 事件]
+
+    style C1 fill:#e3f2fd
+    style P1 fill:#d1e7dd
+    style P2 fill:#d1e7dd
+    style P3 fill:#d1e7dd
+    style P4 fill:#fff9c4
+    style P5 fill:#fff9c4
+    style E1 fill:#e1bee7
+    style E2 fill:#ffccbc</div><table>
+<thead>
+<tr>
+<th>子功能</th>
+<th>输入</th>
+<th>处理逻辑</th>
+<th>输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>主动发现</strong></td>
+<td>K8s API / CMDB API / 服务发现</td>
+<td>周期性拉取 + Diff 对比</td>
+<td>增量拓扑变更</td>
+</tr>
+<tr>
+<td><strong>被动接收</strong></td>
+<td>Kafka Topic（服务变更、实例变更）</td>
+<td>实时消费 + 解析 + 写入</td>
+<td>实时拓扑更新</td>
+</tr>
+<tr>
+<td><strong>实体映射</strong></td>
+<td>原始数据（多种格式）</td>
+<td>格式标准化 + ID 映射 + 去重</td>
+<td>标准化实体</td>
+</tr>
+<tr>
+<td><strong>关系抽取</strong></td>
+<td>标准化实体 + 数据源上下文</td>
+<td>关系类型识别 + 方向判断 + 属性提取</td>
+<td>标准化关系</td>
+</tr>
+<tr>
+<td><strong>冲突解决</strong></td>
+<td>多源同一实体</td>
+<td>优先级策略（CMDB &gt; K8s &gt; Prometheus）</td>
+<td>合并后实体</td>
+</tr>
+<tr>
+<td><strong>图谱写入</strong></td>
+<td>合并后实体 + 关系</td>
+<td>Neo4j Transaction + 批量写入</td>
+<td>图数据库记录</td>
+</tr>
+</tbody></table>
+<h4>冲突解决策略详解</h4>
+<p>多源数据不可避免出现冲突，按以下优先级链处理：</p>
+<table>
+<thead>
+<tr>
+<th>冲突场景</th>
+<th>默认策略</th>
+<th>可配置选项</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>同一实体属性冲突</strong></td>
+<td>CMDB &gt; K8s &gt; Prometheus &gt; Service Mesh</td>
+<td>按数据源调整优先级</td>
+</tr>
+<tr>
+<td><strong>实体删除冲突</strong></td>
+<td>一个源删除 + 另一源存在 → 标记疑似删除，人工确认</td>
+<td>自动删除 / 标记</td>
+</tr>
+<tr>
+<td><strong>关系方向冲突</strong></td>
+<td>服务调用关系以 Service Mesh 为准</td>
+<td>可指定权威数据源</td>
+</tr>
+<tr>
+<td><strong>类型不一致冲突</strong></td>
+<td>同一 ID 在不同源类型不同 → 报错 + 人工介入</td>
+<td>忽略 / 取新</td>
+</tr>
+</tbody></table>
+<h3>3.2 拓扑更新</h3>
+<div class="mermaid">flowchart TB
+    subgraph 增量["增量更新"]
+        U1[变更检测
+Hash Diff]
+        U2[影响评估
+变更范围]
+        U3[原子更新
+ACID Transaction]
+        U4[事件发布
+Kafka]
+    end
+    subgraph 全量["全量更新"]
+        F1[周期全量
+每日 / 每周]
+        F2[快照存储
+时序数据库]
+        F3[Diff 对比
+变更集]
+    end
+    U1 --> U2 --> U3 --> U4
+    F1 --> F2 --> F3
+    style 增量 fill:#d1e7dd
+    style 全量 fill:#fff9c4</div><table>
+<thead>
+<tr>
+<th>更新策略</th>
+<th>触发条件</th>
+<th>更新范围</th>
+<th>延迟</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>实时增量</strong></td>
+<td>Kafka 事件 / K8s Webhook</td>
+<td>变更节点 + 直接关联边</td>
+<td>&lt; 1s</td>
+</tr>
+<tr>
+<td><strong>定时增量</strong></td>
+<td>每 5 分钟轮询</td>
+<td>上次轮询至今的变更</td>
+<td>&lt; 5min</td>
+</tr>
+<tr>
+<td><strong>全量同步</strong></td>
+<td>每日 02:00 / 手动触发</td>
+<td>全部实体 + 关系</td>
+<td>&lt; 30min</td>
+</tr>
+<tr>
+<td><strong>故障触发</strong></td>
+<td>检测到数据源异常恢复</td>
+<td>故障时段变更</td>
+<td>&lt; 5min</td>
+</tr>
+</tbody></table>
+<h3>3.3 拓扑查询</h3>
+<table>
+<thead>
+<tr>
+<th>查询类型</th>
+<th>Cypher 示例</th>
+<th>场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>节点查询</strong></td>
+<td><code>MATCH (n:Service {name: $name}) RETURN n</code></td>
+<td>按名称/类型查找节点</td>
+</tr>
+<tr>
+<td><strong>路径查询</strong></td>
+<td><code>MATCH path = (a)-[:calls*1..3]-(b) WHERE a.name=$x RETURN path</code></td>
+<td>查找两点间所有路径</td>
+</tr>
+<tr>
+<td><strong>邻居查询</strong></td>
+<td><code>MATCH (n)-[r]-(m) WHERE n.name=$name RETURN m</code></td>
+<td>查找直接关联节点</td>
+</tr>
+<tr>
+<td><strong>子图查询</strong></td>
+<td><code>MATCH p = ()-[*1..2]-() WHERE all(n IN nodes(p) WHERE n.cluster=$cluster) RETURN p</code></td>
+<td>按条件截取子图</td>
+</tr>
+<tr>
+<td><strong>聚合查询</strong></td>
+<td><code>MATCH (n:Service) RETURN n.namespace, count(n) AS cnt</code></td>
+<td>按属性聚合统计</td>
+</tr>
+<tr>
+<td><strong>时序查询</strong></td>
+<td><code>MATCH (n)-[r]-&gt;(m) WHERE r.updated_at &gt; $since RETURN r</code></td>
+<td>查询变更历史</td>
+</tr>
+</tbody></table>
+<h4>实战查询场景</h4>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>查询意图</th>
+<th>结果示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SQL 慢查询分析</strong></td>
+<td>查找 <code>order-svc</code> 依赖的所有数据库实例</td>
+<td><code>order-svc → calls → order-db:5432</code> + <code>order-svc → calls → user-db:3306</code></td>
+</tr>
+<tr>
+<td><strong>发布影响评估</strong></td>
+<td>查找 <code>api-gateway</code> 新版本部署后会影响的上下游</td>
+<td>上游依赖（3 个服务）· 下游被调用（8 个服务）· 间接影响（15 个端点）</td>
+</tr>
+<tr>
+<td><strong>故障隔离范围</strong></td>
+<td>查找 <code>payment-svc</code> 不可达时可能影响的所有路径</td>
+<td>连通分量分析 → 3 个服务 + 2 个数据库将不可达</td>
+</tr>
+<tr>
+<td><strong>链路追踪辅助</strong></td>
+<td>查找从 <code>frontend</code> 到 <code>recommend</code> 的所有调用链</td>
+<td>4 条路径：最长 5 跳，最短 2 跳</td>
+</tr>
+<tr>
+<td><strong>配置变更验证</strong></td>
+<td>新上线 <code>redis-cluster-2</code> 后，检查哪些服务已连接到新节点</td>
+<td>已迁移: <code>session-svc</code> / <code>cache-svc</code> · 未迁移: <code>rate-limiter</code>（告警）</td>
+</tr>
+</tbody></table>
+<h3>3.4 拓扑分析</h3>
+<table>
+<thead>
+<tr>
+<th>分析算法</th>
+<th>输入</th>
+<th>输出</th>
+<th>应用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>连通分量</strong></td>
+<td>全量拓扑</td>
+<td>连通分量列表</td>
+<td>故障隔离范围判断</td>
+</tr>
+<tr>
+<td><strong>强连通分量 SCC</strong></td>
+<td>有向拓扑</td>
+<td>SCC 列表</td>
+<td>服务循环依赖检测</td>
+</tr>
+<tr>
+<td><strong>PageRank</strong></td>
+<td>有向拓扑</td>
+<td>节点排名分数</td>
+<td>核心服务识别</td>
+</tr>
+<tr>
+<td><strong>介数中心性</strong></td>
+<td>拓扑图</td>
+<td>节点介数分数</td>
+<td>关键链路识别</td>
+</tr>
+<tr>
+<td><strong>社区发现 Louvain</strong></td>
+<td>无向拓扑</td>
+<td>社区划分</td>
+<td>服务分组分析</td>
+</tr>
+<tr>
+<td><strong>故障传播路径</strong></td>
+<td>故障节点</td>
+<td>传播路径 DAG</td>
+<td>影响分析、根因推理</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. 技术实现</h2>
+<h3>4.1 数据采集</h3>
+<div class="mermaid">flowchart LR
+    subgraph 数据源
+        DS1[K8s API Server]
+        DS2[CMDB]
+        DS3[Service Mesh]
+        DS4[Prometheus]
+        DS5[DNS 系统]
+    end
+    subgraph 采集层
+        CL1[主动发现
+API轮询]
+        CL2[被动接收
+Webhook / Kafka]
+    end
+    subgraph 处理层
+        PR1[格式解析]
+        PR2[实体映射]
+        PR3[关系抽取]
+        PR4[冲突解决]
+    end
+    DS1 & DS2 & DS3 & DS4 & DS5 --> CL1 & CL2
+    CL1 & CL2 --> PR1 --> PR2 --> PR3 --> PR4
+    style 数据源 fill:#e3f2fd
+    style 采集层 fill:#d1e7dd
+    style 处理层 fill:#fff9c4</div><table>
+<thead>
+<tr>
+<th>数据源</th>
+<th>采集方式</th>
+<th>频率</th>
+<th>数据内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>K8s API Server</strong></td>
+<td>Watch + List</td>
+<td>实时 + 5min 轮询</td>
+<td>Node / Pod / Service / Endpoint / Ingress</td>
+</tr>
+<tr>
+<td><strong>CMDB</strong></td>
+<td>REST API 轮询</td>
+<td>5min 轮询</td>
+<td>主机 / 网络设备 / 存储设备</td>
+</tr>
+<tr>
+<td><strong>Service Mesh</strong></td>
+<td>Envoy ADS / CDS</td>
+<td>实时</td>
+<td>服务发现 / 流量拓扑 / 路由规则</td>
+</tr>
+<tr>
+<td><strong>Prometheus</strong></td>
+<td>PromQL + Targets</td>
+<td>15s 轮询</td>
+<td>指标采集目标 / 告警规则</td>
+</tr>
+<tr>
+<td><strong>DNS 系统</strong></td>
+<td>DNS Zone Transfer</td>
+<td>1h 轮询</td>
+<td>域名解析 / CNAME / A 记录</td>
+</tr>
+</tbody></table>
+<h3>4.2 存储架构</h3>
+<table>
+<thead>
+<tr>
+<th>存储引擎</th>
+<th>存储内容</th>
+<th>数据模型</th>
+<th>容量规划</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Neo4j</strong></td>
+<td>实体 + 关系 + 属性</td>
+<td>属性图（Property Graph）</td>
+<td>100 万节点 / 1000 万边</td>
+</tr>
+<tr>
+<td><strong>TimescaleDB</strong></td>
+<td>拓扑变更时序</td>
+<td>时序表（node_changes / edge_changes）</td>
+<td>保留 90 天</td>
+</tr>
+<tr>
+<td><strong>Kafka</strong></td>
+<td>变更事件流</td>
+<td>6 个 Topic（按事件类型分区）</td>
+<td>保留 7 天</td>
+</tr>
+<tr>
+<td><strong>Redis</strong></td>
+<td>查询缓存 + 变更缓冲</td>
+<td>String / Hash / Sorted Set</td>
+<td>10GB</td>
+</tr>
+</tbody></table>
+<h3>4.3 缓存策略</h3>
+<table>
+<thead>
+<tr>
+<th>缓存类型</th>
+<th>内容</th>
+<th>TTL</th>
+<th>更新策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>节点缓存</strong></td>
+<td>高频查询节点</td>
+<td>5 分钟</td>
+<td>LRU + 变更事件失效</td>
+</tr>
+<tr>
+<td><strong>路径缓存</strong></td>
+<td>热点路径查询结果</td>
+<td>1 分钟</td>
+<td>LRU + 边变更失效</td>
+</tr>
+<tr>
+<td><strong>聚合缓存</strong></td>
+<td>服务统计 / 集群统计</td>
+<td>5 分钟</td>
+<td>定时刷新</td>
+</tr>
+<tr>
+<td><strong>时序缓冲</strong></td>
+<td>变更事件批量写入缓冲</td>
+<td>实时 flush</td>
+<td>时间/数量双阈值触发</td>
+</tr>
+</tbody></table>
+<h3>4.4 错误处理与边界场景</h3>
+<table>
+<thead>
+<tr>
+<th>异常场景</th>
+<th>检测方式</th>
+<th>处理策略</th>
+<th>恢复动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>数据源不可达</strong></td>
+<td>健康检查超时</td>
+<td>使用缓存数据 + 标记数据源离线</td>
+<td>重试 3 次 → 指数退避 → 告警</td>
+</tr>
+<tr>
+<td><strong>数据格式异常</strong></td>
+<td>Schema 校验失败</td>
+<td>跳过异常记录 + 写入死信队列</td>
+<td>人工检视死信队列</td>
+</tr>
+<tr>
+<td><strong>实体 ID 冲突</strong></td>
+<td>唯一约束冲突</td>
+<td>按优先级链合并</td>
+<td>记录冲突日志</td>
+</tr>
+<tr>
+<td><strong>Neo4j 写入失败</strong></td>
+<td>事务异常</td>
+<td>回滚 + 重试队列</td>
+<td>落盘到本地队列，恢复后回放</td>
+</tr>
+<tr>
+<td><strong>Kafka 消费积压</strong></td>
+<td>消费延迟 &gt; 阈值</td>
+<td>降级为批处理模式</td>
+<td>积压消除后恢复实时</td>
+</tr>
+<tr>
+<td><strong>全量同步中断</strong></td>
+<td>同步任务超时</td>
+<td>标记断点 + 下次从断点续传</td>
+<td>重试 + 通知运维</td>
+</tr>
+</tbody></table>
+<h3>4.5 图分析引擎</h3>
+<div class="mermaid">flowchart LR
+    G1[查询请求] --> G2[查询计划生成
+Cypher Parser]
+    G2 --> G3[查询优化
+Index + Cost Model]
+    G3 --> G4[执行引擎
+运行时]
+    G4 --> G5[结果聚合]
+    G5 --> G6[返回结果]
+
+    G4 -->|深度查询| A1[图算法库
+PageRank / Louvain
+连通分量]
+    A1 --> G5
+
+    style G1 fill:#e3f2fd
+    style G2 fill:#d1e7dd
+    style G3 fill:#fff9c4
+    style G4 fill:#ffccbc
+    style A1 fill:#e1bee7
+    style G5 fill:#e1bee7
+    style G6 fill:#d1e7dd</div><table>
+<thead>
+<tr>
+<th>组件</th>
+<th>技术选型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>查询语言</strong></td>
+<td>Cypher</td>
+<td>Neo4j 原生查询语言</td>
+</tr>
+<tr>
+<td><strong>查询优化器</strong></td>
+<td>Cost-based Optimizer</td>
+<td>基于统计信息选择最优执行计划</td>
+</tr>
+<tr>
+<td><strong>图算法库</strong></td>
+<td>Neo4j Graph Data Science (GDS)</td>
+<td>PageRank、Louvain、连通分量等</td>
+</tr>
+<tr>
+<td><strong>索引</strong></td>
+<td>Composite Index + Range Index</td>
+<td>支持多字段组合查询</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. 接口设计</h2>
+<h3>5.1 REST API</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+<th>响应</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/topology/nodes</code></td>
+<td>查询节点列表</td>
+<td>NodeList</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/topology/nodes/{id}</code></td>
+<td>查询单个节点</td>
+<td>Node</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/topology/edges</code></td>
+<td>查询边列表</td>
+<td>EdgeList</td>
+</tr>
+<tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/topology/query/path</code></td>
+<td>路径查询</td>
+<td>Path[]</td>
+</tr>
+<tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/topology/query/neighbors</code></td>
+<td>邻居查询</td>
+<td>Node[]</td>
+</tr>
+<tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/topology/query/subgraph</code></td>
+<td>子图查询</td>
+<td>Graph</td>
+</tr>
+<tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/topology/analyze</code></td>
+<td>拓扑分析</td>
+<td>AnalyzeResult</td>
+</tr>
+<tr>
+<td><strong>GET</strong></td>
+<td><code>/api/v1/topology/stats</code></td>
+<td>拓扑统计</td>
+<td>TopologyStats</td>
+</tr>
+<tr>
+<td><strong>POST</strong></td>
+<td><code>/api/v1/topology/sync/trigger</code></td>
+<td>手动触发同步</td>
+<td>SyncJob</td>
+</tr>
+</tbody></table>
+<h3>5.2 gRPC 接口</h3>
+<table>
+<thead>
+<tr>
+<th>服务</th>
+<th>方法</th>
+<th>说明</th>
+<th>场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>TopologyService</strong></td>
+<td>GetNode</td>
+<td>获取单个节点</td>
+<td>故障研判上下文</td>
+</tr>
+<tr>
+<td><strong>TopologyService</strong></td>
+<td>FindPath</td>
+<td>路径查询</td>
+<td>根因分析传播路径</td>
+</tr>
+<tr>
+<td><strong>TopologyService</strong></td>
+<td>GetNeighbors</td>
+<td>邻居查询</td>
+<td>影响分析</td>
+</tr>
+<tr>
+<td><strong>TopologyService</strong></td>
+<td>GetSubGraph</td>
+<td>子图查询</td>
+<td>服务拓扑大图</td>
+</tr>
+<tr>
+<td><strong>TopologyService</strong></td>
+<td>AnalyzeGraph</td>
+<td>拓扑分析</td>
+<td>PageRank / 社区发现</td>
+</tr>
+<tr>
+<td><strong>TopologyService</strong></td>
+<td>SyncTopology</td>
+<td>触发全量同步</td>
+<td>管理面操作</td>
+</tr>
+</tbody></table>
+<h3>5.3 Kafka 事件流</h3>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>事件类型</th>
+<th>Payload</th>
+<th>消费者</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>topology.node.created</code></td>
+<td>节点创建</td>
+<td>NodeCreatedEvent</td>
+<td>认知网络、智能感知</td>
+</tr>
+<tr>
+<td><code>topology.node.updated</code></td>
+<td>节点更新</td>
+<td>NodeUpdatedEvent</td>
+<td>认知网络、智能感知</td>
+</tr>
+<tr>
+<td><code>topology.node.deleted</code></td>
+<td>节点删除</td>
+<td>NodeDeletedEvent</td>
+<td>认知网络、智能感知</td>
+</tr>
+<tr>
+<td><code>topology.edge.created</code></td>
+<td>边创建</td>
+<td>EdgeCreatedEvent</td>
+<td>认知网络、根因分析</td>
+</tr>
+<tr>
+<td><code>topology.edge.updated</code></td>
+<td>边更新</td>
+<td>EdgeUpdatedEvent</td>
+<td>认知网络、根因分析</td>
+</tr>
+<tr>
+<td><code>topology.sync.completed</code></td>
+<td>同步完成</td>
+<td>SyncCompletedEvent</td>
+<td>监控告警</td>
+</tr>
+</tbody></table>
+<h3>5.4 接口质量指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>SLO 目标</th>
+<th>告警阈值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>可用性</strong></td>
+<td>99.95%</td>
+<td>&lt; 99.9%</td>
+</tr>
+<tr>
+<td><strong>节点查询延迟 P99</strong></td>
+<td>&lt; 50ms</td>
+<td>&gt; 100ms</td>
+</tr>
+<tr>
+<td><strong>路径查询延迟 P99</strong></td>
+<td>&lt; 200ms</td>
+<td>&gt; 500ms</td>
+</tr>
+<tr>
+<td><strong>子图查询延迟 P99</strong></td>
+<td>&lt; 1s</td>
+<td>&gt; 2s</td>
+</tr>
+<tr>
+<td><strong>实时更新延迟</strong></td>
+<td>&lt; 1s</td>
+<td>&gt; 5s</td>
+</tr>
+<tr>
+<td><strong>图分析延迟 P99</strong></td>
+<td>&lt; 5s</td>
+<td>&gt; 10s</td>
+</tr>
+<tr>
+<td><strong>吞吐量</strong></td>
+<td>&gt; 5000 QPS</td>
+<td>&lt; 2000 QPS</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. 量化指标</h2>
+<h3>6.1 性能指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标名称</th>
+<th>当前基线</th>
+<th>目标值</th>
+<th>测量方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>节点查询延迟 P99</strong></td>
+<td>&lt; 80ms</td>
+<td>&lt; 50ms</td>
+<td>APM 追踪</td>
+</tr>
+<tr>
+<td><strong>路径查询延迟 P99</strong></td>
+<td>&lt; 300ms</td>
+<td>&lt; 200ms</td>
+<td>APM 追踪</td>
+</tr>
+<tr>
+<td><strong>子图查询延迟 P99</strong></td>
+<td>&lt; 2s</td>
+<td>&lt; 1s</td>
+<td>APM 追踪</td>
+</tr>
+<tr>
+<td><strong>实时更新延迟</strong></td>
+<td>&lt; 3s</td>
+<td>&lt; 1s</td>
+<td>变更时间戳差值</td>
+</tr>
+<tr>
+<td><strong>图分析延迟 P99</strong></td>
+<td>&lt; 10s</td>
+<td>&lt; 5s</td>
+<td>日志时间戳</td>
+</tr>
+<tr>
+<td><strong>全量同步时间</strong></td>
+<td>&lt; 45min</td>
+<td>&lt; 30min</td>
+<td>同步任务日志</td>
+</tr>
+<tr>
+<td><strong>API 吞吐量</strong></td>
+<td>&gt; 3000 QPS</td>
+<td>&gt; 5000 QPS</td>
+<td>Prometheus metrics</td>
+</tr>
+</tbody></table>
+<h3>6.2 准确指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标名称</th>
+<th>当前基线</th>
+<th>目标值</th>
+<th>测量方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>实体覆盖率</strong></td>
+<td>90%</td>
+<td>&gt; 98%</td>
+<td>与 CMDB 对比</td>
+</tr>
+<tr>
+<td><strong>关系准确率</strong></td>
+<td>92%</td>
+<td>&gt; 97%</td>
+<td>人工抽检验证</td>
+</tr>
+<tr>
+<td><strong>数据一致性</strong></td>
+<td>95%</td>
+<td>99.5%</td>
+<td>多源交叉验证</td>
+</tr>
+<tr>
+<td><strong>重复实体率</strong></td>
+<td>&lt; 3%</td>
+<td>&lt; 0.5%</td>
+<td>ID 去重分析</td>
+</tr>
+<tr>
+<td><strong>孤立节点率</strong></td>
+<td>&lt; 5%</td>
+<td>&lt; 2%</td>
+<td>图分析算法</td>
+</tr>
+</tbody></table>
+<h3>6.3 可用指标</h3>
+<table>
+<thead>
+<tr>
+<th>指标名称</th>
+<th>当前基线</th>
+<th>目标值</th>
+<th>测量方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>系统可用性</strong></td>
+<td>99.5%</td>
+<td>99.95%</td>
+<td>正常运行时间统计</td>
+</tr>
+<tr>
+<td><strong>数据完整性</strong></td>
+<td>99%</td>
+<td>99.99%</td>
+<td>缺失数据比率监控</td>
+</tr>
+<tr>
+<td><strong>事件丢失率</strong></td>
+<td>&lt; 0.1%</td>
+<td>&lt; 0.01%</td>
+<td>Kafka 消费位点校验</td>
+</tr>
+<tr>
+<td><strong>Neo4j 可用性</strong></td>
+<td>99.9%</td>
+<td>99.99%</td>
+<td>健康检查</td>
+</tr>
+<tr>
+<td><strong>同步成功率</strong></td>
+<td>95%</td>
+<td>&gt; 99%</td>
+<td>同步任务结果统计</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. 部署架构</h2>
+<h3>7.1 K8s 部署架构</h3>
+<div class="mermaid">flowchart TB
+    subgraph K8s["Kubernetes 集群"]
+        subgraph 数据层["数据层 StatefulSet"]
+            NB1[Neo4j Primary]
+            NB2[Neo4j Replica1]
+            NB3[Neo4j Replica2]
+            RD[Redis Cluster]
+            KG[Kafka Broker]
+        end
+        subgraph 服务层["服务层 Deployment"]
+            TMS[Topology Svc x3]
+            TMA[Topology API x2]
+        end
+        subgraph 采集层["采集层 DaemonSet"]
+            TC[Topology Collector]
+        end
+    end
+    subgraph 外部["外部数据源"]
+        K8S_API[K8s API Server]
+        CMDB[CMDB]
+    end
+    K8S_API --> TC
+    CMDB --> TC
+    TC --> TMS
+    TMS --> NB1
+    TMS --> RD
+    TMS --> KG
+    TMA --> TMS
+    TMA --> NB1
+    NB1 --> NB2
+    NB1 --> NB3
+    style K8s fill:#f0f9ff
+    style 数据层 fill:#fff9c4
+    style 服务层 fill:#d1e7dd
+    style 采集层 fill:#ffccbc</div><h3>7.2 资源配置</h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>副本数</th>
+<th>CPU</th>
+<th>Memory</th>
+<th>Storage</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Topology Service</strong></td>
+<td>3</td>
+<td>2 核</td>
+<td>4Gi</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Topology API</strong></td>
+<td>2</td>
+<td>1 核</td>
+<td>2Gi</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Topology Collector</strong></td>
+<td>DaemonSet</td>
+<td>0.5 核</td>
+<td>512Mi</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Neo4j</strong></td>
+<td>3（1 主 2 从）</td>
+<td>4 核</td>
+<td>16Gi</td>
+<td>500Gi SSD</td>
+</tr>
+<tr>
+<td><strong>Redis Cluster</strong></td>
+<td>3</td>
+<td>2 核</td>
+<td>8Gi</td>
+<td>10Gi</td>
+</tr>
+<tr>
+<td><strong>Kafka Broker</strong></td>
+<td>3</td>
+<td>2 核</td>
+<td>4Gi</td>
+<td>100Gi SSD</td>
+</tr>
+</tbody></table>
+<h3>7.3 高可用设计</h3>
+<table>
+<thead>
+<tr>
+<th>高可用策略</th>
+<th>实现方式</th>
+<th>故障切换时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Neo4j 高可用</strong></td>
+<td>因果集群（Causal Cluster）1 主 2 从</td>
+<td>&lt; 30s</td>
+</tr>
+<tr>
+<td><strong>Redis 高可用</strong></td>
+<td>Cluster 模式 + 自动故障转移</td>
+<td>&lt; 10s</td>
+</tr>
+<tr>
+<td><strong>Kafka 高可用</strong></td>
+<td>3 副本 + ISR</td>
+<td>&lt; 30s</td>
+</tr>
+<tr>
+<td><strong>服务高可用</strong></td>
+<td>K8s HPA + 就绪探针 + 存活探针</td>
+<td>&lt; 60s</td>
+</tr>
+<tr>
+<td><strong>数据备份</strong></td>
+<td>Neo4j 定时快照 + 异地备份</td>
+<td>每日 03:00</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. 本章小结</h2>
+<h3>8.1 核心要点速记</h3>
+<p><strong>5 个关键认知：</strong></p>
+<ol>
+<li><strong>拓扑是平台的数字底盘</strong> — 为所有上层智能分析模块提供拓扑数据服务</li>
+<li><strong>实体 + 关系 + 属性统一模型</strong> — 覆盖物理层、逻辑层、实例层、运行时层全层级</li>
+<li><strong>图数据库 + 时序数据库 + Kafka</strong> — 三种存储引擎各司其职（图谱/变更/事件）</li>
+<li><strong>实时增量 + 定时全量双轨更新</strong> — 保证数据新鲜度和完整性</li>
+<li><strong>变更事件驱动上游模块</strong> — 通过 Kafka 事件总线实现模块间松耦合</li>
+</ol>
+<p><strong>4 个架构目标：</strong></p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>描述</th>
+<th>量化指标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>高性能查询</strong></td>
+<td>P99 节点查询 &lt; 50ms</td>
+<td>路径查询 &lt; 200ms</td>
+</tr>
+<tr>
+<td><strong>高覆盖率</strong></td>
+<td>实体覆盖率 &gt; 98%</td>
+<td>关系准确率 &gt; 97%</td>
+</tr>
+<tr>
+<td><strong>强一致性</strong></td>
+<td>数据一致性 99.5%</td>
+<td>事件丢失率 &lt; 0.01%</td>
+</tr>
+<tr>
+<td><strong>高可用</strong></td>
+<td>系统可用性 99.95%</td>
+<td>故障切换 &lt; 60s</td>
+</tr>
+</tbody></table>
+<h3>8.2 接口矩阵</h3>
+<table>
+<thead>
+<tr>
+<th>接口类型</th>
+<th>数量</th>
+<th>关键接口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>REST API</strong></td>
+<td>9 个</td>
+<td>节点查询、路径查询、子图查询、拓扑分析</td>
+</tr>
+<tr>
+<td><strong>gRPC</strong></td>
+<td>6 个</td>
+<td>GetNode、FindPath、GetNeighbors、AnalyzeGraph</td>
+</tr>
+<tr>
+<td><strong>Kafka Topic</strong></td>
+<td>6 个</td>
+<td>节点创建/更新/删除、边创建/更新、同步完成</td>
+</tr>
+</tbody></table>
+<h3>8.3 关键成功要素</h3>
+<table>
+<thead>
+<tr>
+<th>要素</th>
+<th>说明</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>多源数据汇聚</strong></td>
+<td>CMDB、K8s、Service Mesh、Prometheus 多源融合</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>实体 ID 统一</strong></td>
+<td>跨数据源的实体 ID 映射与去重</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>实时更新延迟</strong></td>
+<td>拓扑变更到上层感知 &lt; 1s</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>查询性能</strong></td>
+<td>P99 节点查询 &lt; 50ms、路径查询 &lt; 200ms</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>高可用架构</strong></td>
+<td>Neo4j 因果集群 + Redis Cluster + Kafka 多副本</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>图分析算法</strong></td>
+<td>PageRank、中心性、社区发现、故障传播</td>
+<td>P2</td>
+</tr>
+</tbody></table>
+<h3>8.4 本章思考</h3>
+<blockquote>
+<p>以下问题供设计评审和团队讨论时使用，旨在检验对拓扑建模模块的理解深度。</p>
+</blockquote>
+<p><strong>基础问题：</strong></p>
+<ol>
+<li>拓扑建模模块为什么选择「属性图」模型而非「资源-关系」ER 模型？两种模型在运维场景中的本质差异是什么？</li>
+<li>如果 CMDB 和 K8s 对同一台主机的 IP 地址返回不同值，应按什么策略处理？什么场景下应该自动合并，什么场景下必须人工介入？</li>
+<li>全量同步中断超过 1 小时后恢复，如何确保中间发生的增量变更不丢失、不重复？</li>
+</ol>
+<p><strong>进阶问题：</strong></p>
+<ol start="4">
+<li>在大规模集群（10 万+ 节点）下，实时路径查询（<code>MATCH path = (a)-[:calls*1..5]-(b)</code>）的性能瓶颈在哪里？如何通过图分区或索引优化？</li>
+<li>如果 Service Mesh 数据出现环路依赖（Service A → B → C → A），拓扑建模模块应如何处理？是自动断路还是报错给上层？</li>
+<li>「故障传播路径分析」与「影响范围分析」的本质区别是什么？在图查询层面分别对应什么算法？</li>
+</ol>
+<p><strong>反模式自查：</strong></p>
+<ul>
+<li>❌ <strong>全量查询</strong>：每次故障都查全图 — 正确做法是使用子图查询 + 缓存</li>
+<li>❌ <strong>贫瘠属性</strong>：只存 ID 不存属性 — 每次都需要回查数据源</li>
+<li>❌ <strong>滞后同步</strong>：仅靠定时全量同步 — 关键变更的分钟级延迟可能导致误告警</li>
+<li>❌ <strong>无主数据源</strong>：每个数据源都视为权威 — 必须建立数据源优先级链</li>
+</ul>
+<hr>
+<blockquote>
+<p>本章定义了 Observable Ops 平台拓扑建模模块的详细设计规范。模块 02 作为数据基础设施，为模块 04-11 提供拓扑数据服务，是整个平台的核心数据底盘。</p>
+</blockquote>
+<p><em>文档版本：V1.1 | 更新日期：2026-06-08</em></p>
+
+      </article>
+    </main>
+  </div>
+
+  <script>
+    // Accordion sidebar: only one section open at a time
+    document.querySelectorAll('.sidebar-section-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const items = header.nextElementSibling;
+        const isOpen = items.classList.contains('open');
+        // Close all sections first
+        document.querySelectorAll('.sidebar-section-items').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.sidebar-section-header').forEach(el => el.classList.remove('open'));
+        // Open clicked section only if it was closed
+        if (!isOpen) {
+          items.classList.add('open');
+          header.classList.add('open');
+        }
+      });
+    });
+
+    // Open current page's section; highlight active link
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+      if (link.getAttribute('href') === currentPath) {
+        link.classList.add('active');
+        const section = link.closest('.sidebar-section-items');
+        const header = section ? section.previousElementSibling : null;
+        if (section) section.classList.add('open');
+        if (header) header.classList.add('open');
+      }
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        document.querySelectorAll('.sidebar-section-items a').forEach(link => {
+          const text = link.textContent.toLowerCase();
+          const li = link.closest('li');
+          li.style.display = (query === '' || text.includes(query)) ? '' : 'none';
+        });
+        document.querySelectorAll('.sidebar-section-items').forEach(section => {
+          const hasVisible = section.querySelectorAll('li:not([style*="display: none"])').length > 0;
+          const header = section.previousElementSibling;
+          if (hasVisible || query === '') {
+            section.classList.add('open');
+            header.classList.add('open');
+          }
+        });
+      });
+    }
+
+    // Mobile toggle
+    document.querySelector('.sidebar-toggle')?.addEventListener('click', () => {
+      document.querySelector('.sidebar').classList.toggle('open');
+    });
+
+    // Mermaid: Load dynamically
+    (function() {
+      const mermaidDivs = document.querySelectorAll('.mermaid');
+      if (mermaidDivs.length === 0) return;
+
+      const cdns = [
+        '/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js',
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js'
+      ];
+      let cdnIndex = 0;
+
+      function showError(msg) {
+        mermaidDivs.forEach(div => {
+          div.innerHTML = '<div class="mermaid-error" style="padding:16px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:20px 0;">' + msg + '</div>';
+          div.classList.add('rendered');
+        });
+      }
+
+      function tryLoadMermaid() {
+        if (cdnIndex >= cdns.length) {
+          showError('❌ 无法加载图表库，请检查网络连接后刷新页面');
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = cdns[cdnIndex];
+        script.onload = function() {
+          if (typeof mermaid === 'undefined') {
+            showError('❌ 图表库加载失败');
+            return;
+          }
+          try {
+            mermaid.run({
+              querySelector: '.mermaid',
+              startOnLoad: false,
+              theme: 'base',
+              themeVariables: {
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+                primaryColor: '#4f46e5',
+                primaryTextColor: '#1e293b',
+                primaryBorderColor: '#4f46e5',
+                lineColor: '#64748b',
+                secondaryColor: '#f1f5f9',
+                tertiaryColor: '#f8fafc',
+              },
+              securityLevel: 'loose',
+              flowchart: { curve: 'basis', padding: 15, nodeSpacing: 50, rankSpacing: 80 },
+              maxTextSize: 50000,
+            });
+            mermaidDivs.forEach(div => div.classList.add('rendered'));
+          } catch(e) {
+            showError('❌ 图表渲染失败: ' + e.message);
+          }
+        };
+        script.onerror = function() { cdnIndex++; tryLoadMermaid(); };
+        document.head.appendChild(script);
+      }
+      tryLoadMermaid();
+    })();
+  </script>
+</body>
+</html>
